@@ -1,0 +1,162 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Westchester Long-Tenure Homes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;background:#f3f4f6}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:#0f172a;color:#fff}
+header h1{font-size:17px;margin:0 12px 0 0}.stat{background:#1e293b;border-radius:8px;padding:4px 10px}.stat b{font-size:16px}
+button{border:0;border-radius:7px;padding:7px 12px;background:#2563eb;color:#fff;cursor:pointer;font:inherit}button.sec{background:#475569}
+#wrap{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 56px)}
+#filters{overflow:auto;background:#fff;border-right:1px solid #e5e7eb;padding:8px 10px}
+#main{display:grid;grid-template-rows:55% 45%;min-width:0}#map{min-height:200px}
+#tablewrap{overflow:auto;background:#fff;border-top:1px solid #e5e7eb}
+table{border-collapse:collapse;width:100%;font-size:12.5px}th{position:sticky;top:0;background:#f8fafc;cursor:pointer;text-align:left;padding:6px;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+td{padding:5px 6px;border-bottom:1px solid #f1f5f9;white-space:nowrap}tr:hover td{background:#eff6ff;cursor:pointer}
+details.f{border-bottom:1px solid #f1f5f9;padding:5px 0}details.f summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details.f summary .on{color:#2563eb;font-size:11px}.tip{display:block;color:#6b7280;font-size:11.5px;margin:3px 0}
+.rng{display:flex;gap:6px;align-items:center}.rng input[type=number]{width:46%;padding:4px;border:1px solid #d1d5db;border-radius:5px}
+.opts{max-height:160px;overflow:auto}.opts label{display:block;font-size:12.5px}.unk{font-size:11.5px;color:#374151;display:block;margin-top:3px}
+.grp{font-size:11px;text-transform:uppercase;color:#64748b;margin:12px 0 2px;letter-spacing:.05em}
+#card{position:fixed;right:12px;top:66px;width:380px;max-height:calc(100vh - 80px);overflow:auto;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px;display:none;z-index:1000}
+#card h2{font-size:16px;margin:0 0 6px}#card table td{white-space:normal;font-size:12px}#card table td:first-child{color:#6b7280;width:45%}
+#about{position:fixed;inset:5% 10%;background:#fff;z-index:2000;border-radius:12px;padding:16px;overflow:auto;display:none;box-shadow:0 10px 40px rgba(0,0,0,.4)}#about pre{white-space:pre-wrap;font-size:12.5px}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;z-index:3000;font-size:18px}
+#ftoggle{display:none}
+@media(max-width:800px){#wrap{grid-template-columns:1fr;height:auto}#filters{display:none;max-height:70vh}#filters.open{display:block}#main{grid-template-rows:55vh 60vh}#ftoggle{display:inline-block}#card{left:8px;right:8px;width:auto}}
+</style></head><body>
+<div id="loading">Loading 58,355 homes…</div>
+<header><h1>Westchester long-tenure homes</h1>
+<span class="stat">Matching <b id="cnt">–</b></span><span class="stat">Median est. price <b id="med">–</b></span>
+<button id="ftoggle" class="sec">Filters</button><button id="reset" class="sec">Reset</button><button id="exp">Export CSV</button><button id="abt" class="sec">About / caveats</button></header>
+<div id="wrap"><div id="filters"></div><div id="main"><div id="map"></div><div id="tablewrap"><table><thead id="th"></thead><tbody id="tb"></tbody></table><div id="more" class="tip" style="padding:6px"></div></div></div></div>
+<div id="card"></div><div id="about"><button class="sec" onclick="about.style.display='none'" style="float:right">Close</button><h2>About this data</h2><pre id="readme"></pre></div>
+<script>
+const README=__README__;
+const B64="__DATA__";
+(async()=>{
+const bin=Uint8Array.from(atob(B64),c=>c.charCodeAt(0));
+const ds=new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip')));
+const D=await ds.json();const N=D.n,C=D.c;
+const g=(c,i)=>{const o=C[c];if(!o)return null;const v=o.v[i];if(v==null)return null;return o.t==='s'?o.d[v]:o.t==='b'?!!v:v};
+// derived columns
+function addDerived(name,fn){const v=new Array(N);for(let i=0;i<N;i++)v[i]=fn(i);C[name]={t:'x',v}}
+const walkLbl=w=>w==null?null:w<25?'Car-dependent':w<50?'Somewhat car-dependent':w<70?'Somewhat walkable':w<90?'Very walkable':"Walker's paradise";
+addDerived('_walk',i=>walkLbl(g('walk_proxy_0_100',i)));
+addDerived('_flood',i=>{const z=g('fema_flood_zone',i);if(z==null)return null;return /^X shaded/.test(z)?'Moderate (500-yr)':/^X/.test(z)?'Minimal':'High risk (100-yr)'});
+addDerived('_slope',i=>{const s=g('slope_deg',i);return s==null?null:s<2?'Flat (<2°)':s<8?'Gentle (2–8°)':s<15?'Moderate (8–15°)':'Steep (15°+)'});
+addDerived('_sun',i=>{const s=g('solar_terrain_index',i);return s==null?null:s<95?'Shaded by terrain (<95)':s<=102?'Average (95–102)':'Sunny slope (>102)'});
+addDerived('_tenure',i=>({yes:'Confirmed 20+ yrs (deed ≤2006)',likely:'Likely 20+ yrs (deed predates records)',unknown:'Unknown (senior signal only)'})[g('tenure_20plus',i)]||null);
+addDerived('_senior',i=>g('senior_signal',i)==null?null:g('senior_signal',i)?'Yes – senior exemption':'No senior exemption on roll');
+addDerived('_own',i=>{const a=[];if(g('owner_occupied_est',i))a.push('Owner lives there');if(g('absentee_owner',i))a.push('Mail goes elsewhere');if(g('trust_or_estate_owner',i))a.push('Trust or estate');return a});
+addDerived('_mnwalk',i=>{const d=g('metro_north_dist_mi',i);return d==null?null:Math.round(d*20)});
+addDerived('_lowprice',i=>{const p=g('est_price_mid',i);return p!=null&&p<150000});
+const val=(c,i)=>C[c].t==='x'?C[c].v[i]:g(c,i);
+const RISK=['Very Low','Relatively Low','Relatively Moderate','Relatively High','Very High'];
+const RL={'Very Low':'Very low','Relatively Low':'Low','Relatively Moderate':'Moderate','Relatively High':'High','Very High':'Very high','Insufficient Data':'Insufficient data','No Rating':'No rating','Not Applicable':'Not applicable'};
+// filter specs
+const F=[
+['Price & value'],
+{k:'price',type:'price',label:'Estimated price ($)',tip:'Assessed value ÷ 2025 state assessment ratio, adjusted to today with Zillow Westchester index. Estimate, not an appraisal. Pick which end of the range to filter on.'},
+{k:'_lowprice',type:'lowp',label:'Include homes estimated under $150k',tip:'~207 homes; usually partial/special assessments, unreliable.'},
+{k:'est_price_per_sqft',type:'range',label:'Est. price per sq ft ($)',tip:'Mid estimate ÷ living sq ft. Blank where sq ft unknown.'},
+['Ownership'],
+{k:'_tenure',type:'cat',label:'Years owned (status)',tip:'Confirmed = last deed dated 2006 or earlier. Likely = no modern deed on roll (older than ~2003 in most towns; 2010 Greenburgh, 2013 North Castle). Any deed (incl. transfer to trust) resets the clock.'},
+{k:'tenure_years_est',type:'range',label:'Years since last deed',tip:'Only for confirmed deeds (from deed control number date).'},
+{k:'_senior',type:'cat',label:'Senior owner signal',tip:'Aged (41800s) or Enhanced STAR (41834) exemption = an owner is 65+. Newer owners get STAR as a credit, so "No" does not mean not senior.'},
+{k:'_own',type:'multi',label:'Owner situation',tip:'Lives there = mailing address matches or has STAR. Mail elsewhere = absentee. Trust/estate from owner name.'},
+['Location'],
+{k:'city_town',type:'cat',label:'Town / city'},
+{k:'school_district_tiger',type:'cat',label:'School district',tip:'Census 2024 school district boundary containing the parcel.'},
+{k:'_walk',type:'cat',label:'Walkability (label)',tip:'Own OpenStreetMap-based score, not Walk Score: shops, dining, groceries, schools, parks, transit within ~1 mile.'},
+{k:'walk_proxy_0_100',type:'range',label:'Walkability score (0–100)'},
+{k:'metro_north_dist_mi',type:'range',label:'Distance to Metro-North (miles)',tip:'Straight line to nearest station. Walk ≈ 20 min per mile.'},
+{k:'_mnwalk',type:'range',label:'Walk to Metro-North (est. minutes)',tip:'Straight-line miles × 20; real routes are longer.'},
+['Home'],
+{k:'living_sqft',type:'range',label:'Living area (sq ft)',tip:'From assessor inventory. Missing in Greenburgh, Lewisboro, North Castle, North Salem, Ossining.'},
+{k:'lot_acres',type:'range',label:'Lot size (acres)'},
+{k:'bedrooms',type:'range',label:'Bedrooms'},{k:'full_baths',type:'range',label:'Full bathrooms'},
+{k:'year_built',type:'range',label:'Year built'},
+['Hazards (FEMA)'],
+{k:'_flood',type:'cat',label:'Flood zone',tip:'FEMA flood map at the parcel point. Not an official determination; part of a lot may differ.'},
+...[['nri_overall_rating','Overall natural hazard risk'],['nri_inland_flood_rating','Inland (river) flooding risk'],['nri_coastal_flood_rating','Coastal flooding risk'],['nri_hurricane_rating','Hurricane risk'],['nri_winter_weather_rating','Winter weather risk'],['nri_ice_storm_rating','Ice storm risk'],['nri_strong_wind_rating','Strong wind risk'],['nri_heat_wave_rating','Heat wave risk'],['nri_cold_wave_rating','Cold wave risk'],['nri_landslide_rating','Landslide risk'],['nri_tornado_rating','Tornado risk']].map(([k,l])=>({k,type:'cat',label:l,tip:'FEMA National Risk Index for the census tract (same for all homes in the tract), relative to the US.',fmt:x=>RL[x]||x,order:RISK})),
+['Terrain & sun'],
+{k:'elevation_ft',type:'range',label:'Elevation (ft)',tip:'USGS 10 m elevation model.'},
+{k:'_slope',type:'cat',label:'Slope of land',tip:'Ground slope averaged ~50 m around the parcel point.'},
+{k:'aspect_dir',type:'cat',label:'Facing direction',tip:'Direction the ground slopes down toward. South-facing gets more sun.'},
+{k:'_sun',type:'cat',label:'Sunlight (terrain)',tip:'Clear-sky sun on the ground vs. a flat open site (=100), from slope, facing and surrounding hills. Ignores trees, buildings, roofs.'},
+];
+const defaults=()=>({price:{which:'est_price_mid'},_lowprice:{on:false}});
+let S=defaults();
+try{const h=decodeURIComponent(location.hash.slice(1));if(h)S=Object.assign(defaults(),JSON.parse(h))}catch(e){}
+const fmt$=v=>v==null?'–':'$'+Math.round(v).toLocaleString();
+function minmax(k){let lo=Infinity,hi=-Infinity;const vs=[];for(let i=0;i<N;i++){const v=val(k,i);if(v!=null)vs.push(v)}vs.sort((a,b)=>a-b);return [vs[0],vs[Math.floor(vs.length*.995)]??vs[vs.length-1],vs[vs.length-1]]}
+const fdiv=document.getElementById('filters');
+function build(){fdiv.innerHTML='';for(const f of F){if(Array.isArray(f)){fdiv.insertAdjacentHTML('beforeend',`<div class="grp">${f[0]}</div>`);continue}
+ const st=S[f.k]||{};const d=document.createElement('details');d.className='f';d.open=!!S[f.k]&&f.type!=='price'?true:false;
+ const tip=f.tip?`<span class="tip">${f.tip}</span>`:'';
+ if(f.type==='lowp'){d.open=true;d.innerHTML=`<summary>${f.label}</summary>${tip}<label class="unk"><input type=checkbox ${st.on?'checked':''}> include</label>`;d.querySelector('input').onchange=e=>{S[f.k]={on:e.target.checked};apply()}}
+ else if(f.type==='range'||f.type==='price'){const k=f.type==='price'?(st.which||'est_price_mid'):f.k;const [mn,p995,mx]=minmax(k);
+  d.innerHTML=`<summary>${f.label}<span class="on"></span></summary>${tip}${f.type==='price'?`<select><option value=est_price_mid>Mid estimate</option><option value=est_price_low>Low estimate</option><option value=est_price_high>High estimate</option></select>`:''}
+  <div class="rng"><input type=number placeholder="min ${mn}" value="${st.min??''}"><span>–</span><input type=number placeholder="max ${mx}" value="${st.max??''}"></div>
+  <input type=range min="${mn}" max="${p995}" step="${(p995-mn)/200||1}" value="${st.max??p995}" style="width:100%"><label class="unk"><input type=checkbox class=u ${st.unk===false?'':'checked'}> include unknown</label>`;
+  const [a,b]=d.querySelectorAll('input[type=number]');const r=d.querySelector('input[type=range]');const u=d.querySelector('.u');const sel=d.querySelector('select');if(sel)sel.value=k;
+  const upd=()=>{const o={};if(a.value!=='')o.min=+a.value;if(b.value!=='')o.max=+b.value;if(!u.checked)o.unk=false;if(sel)o.which=sel.value;S[f.k]=Object.keys(o).length?o:undefined;if(f.type==='price')S.price=Object.assign({which:sel.value},o);apply()};
+  a.onchange=b.onchange=u.onchange=upd;r.oninput=()=>{b.value=Math.round(+r.value*100)/100;upd()};if(sel)sel.onchange=()=>{upd();build()}}
+ else{const counts=new Map();for(let i=0;i<N;i++){let v=val(f.k,i);if(f.type==='multi'){for(const x of v)counts.set(x,(counts.get(x)||0)+1)}else if(v!=null)counts.set(v,(counts.get(v)||0)+1)}
+  let keys=[...counts.keys()];if(f.order)keys.sort((x,y)=>{const a=f.order.indexOf(x),b=f.order.indexOf(y);return (a<0?99:a)-(b<0?99:b)});else keys.sort((x,y)=>typeof x==='string'?x.localeCompare(y):x-y);
+  const sel=new Set(st.v||[]);
+  d.innerHTML=`<summary>${f.label}<span class="on"></span></summary>${tip}<div class=opts>${keys.map(x=>`<label><input type=checkbox value="${String(x).replace(/"/g,'&quot;')}" ${sel.has(String(x))?'checked':''}> ${f.fmt?f.fmt(x):x} <span class=tip style="display:inline">(${counts.get(x).toLocaleString()})</span></label>`).join('')}</div>${f.type==='multi'?'':`<label class="unk"><input type=checkbox class=u ${st.unk===false?'':'checked'}> include unknown</label>`}`;
+  const upd=()=>{const v=[...d.querySelectorAll('.opts input:checked')].map(x=>x.value);const u=d.querySelector('.u');const o={};if(v.length)o.v=v;if(u&&!u.checked)o.unk=false;S[f.k]=Object.keys(o).length?o:undefined;apply()};
+  d.querySelectorAll('input').forEach(x=>x.onchange=upd)}
+ const on=d.querySelector('.on');if(on&&S[f.k]&&(S[f.k].v||S[f.k].min!=null||S[f.k].max!=null||S[f.k].unk===false))on.textContent='active';
+ fdiv.appendChild(d)}}
+let idx=[];
+function pass(i){for(const f of F){if(Array.isArray(f))continue;const st=S[f.k];
+ if(f.type==='lowp'){if(!(st&&st.on)&&C._lowprice.v[i])return false;continue}
+ if(!st)continue;
+ const k=f.type==='price'?(st.which||'est_price_mid'):f.k;const v=val(k,i);
+ if(f.type==='range'||f.type==='price'){if(v==null){if(st.unk===false)return false;continue}if(st.min!=null&&v<st.min)return false;if(st.max!=null&&v>st.max)return false}
+ else if(f.type==='multi'){if(st.v&&!st.v.some(x=>v.includes(x)))return false}
+ else{if(v==null){if(st.unk===false)return false;continue}if(st.v&&!st.v.includes(String(v)))return false}}return true}
+const COLS=[['address','Address'],['city_town','Town'],['est_price_mid','Est. price',fmt$],['tenure_years_est','Yrs owned'],['_tenure','Tenure'],['_senior','Senior'],['living_sqft','Sq ft'],['lot_acres','Acres'],['bedrooms','Beds'],['full_baths','Baths'],['year_built','Built'],['walk_proxy_0_100','Walk'],['metro_north_dist_mi','MN mi'],['_flood','Flood'],['_sun','Sun'],['owner','Owner']];
+let sortK=S._sort||'est_price_mid',sortD=S._dir||-1;
+function apply(){const t0=performance.now();idx=[];for(let i=0;i<N;i++)if(pass(i))idx.push(i);
+ S._sort=sortK;S._dir=sortD;history.replaceState(null,'','#'+encodeURIComponent(JSON.stringify(S)));
+ const pr=idx.map(i=>g('est_price_mid',i)).filter(x=>x!=null).sort((a,b)=>a-b);
+ cnt.textContent=idx.length.toLocaleString();med.textContent=pr.length?fmt$(pr[pr.length>>1]):'–';
+ renderTable();layer.redraw();window.__lastApplyMs=performance.now()-t0}
+function renderTable(){th.innerHTML='<tr>'+COLS.map(([k,l])=>`<th data-k="${k}">${l}${k===sortK?(sortD>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+ th.querySelectorAll('th').forEach(h=>h.onclick=()=>{const k=h.dataset.k;sortD=k===sortK?-sortD:1;sortK=k;apply()});
+ const s=idx.slice().sort((a,b)=>{const x=val(sortK,a),y=val(sortK,b);if(x==null)return 1;if(y==null)return -1;return (x>y?1:x<y?-1:0)*sortD});
+ const show=s.slice(0,500);tb.innerHTML=show.map(i=>'<tr data-i="'+i+'">'+COLS.map(([k,l,f])=>{const v=val(k,i);return `<td>${v==null?'–':f?f(v):v}</td>`}).join('')+'</tr>').join('');
+ more.textContent=idx.length>500?`Showing first 500 of ${idx.length.toLocaleString()} (sorted). Export CSV for all.`:'';
+ tb.querySelectorAll('tr').forEach(r=>r.onclick=()=>{const i=+r.dataset.i;card_(i);map.setView([g('lat',i),g('lon',i)],16)})}
+// map
+const map=L.map('map',{preferCanvas:true}).setView([41.1,-73.75],10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+const Pts=L.Layer.extend({onAdd(m){this.c=L.DomUtil.create('canvas','leaflet-zoom-hide');this.c.style.position='absolute';m.getPanes().overlayPane.appendChild(this.c);m.on('moveend zoomend resize',this.redraw,this);this.redraw()},
+ redraw(){if(!this.c)return;const m=map,sz=m.getSize(),tl=m.containerPointToLayerPoint([0,0]);L.DomUtil.setPosition(this.c,tl);this.c.width=sz.x;this.c.height=sz.y;const x=this.c.getContext('2d');const z=m.getZoom();const r=z<11?1.6:z<14?3:5;
+  this.px=[];for(const i of idx){const la=g('lat',i);if(la==null)continue;const p=m.latLngToContainerPoint([la,g('lon',i)]);if(p.x<-5||p.y<-5||p.x>sz.x+5||p.y>sz.y+5)continue;this.px.push([p.x,p.y,i]);
+   x.fillStyle=g('senior_signal',i)?'#dc2626':g('tenure_20plus',i)==='yes'?'#2563eb':'#0d9488';x.beginPath();x.arc(p.x,p.y,r,0,7);x.fill()}}});
+const layer=new Pts();layer.addTo(map);
+const lg=L.control({position:'bottomleft'});lg.onAdd=()=>{const d=L.DomUtil.create('div');d.style.cssText='background:#fff;padding:6px 8px;border-radius:6px;font-size:12px';d.innerHTML='<span style="color:#dc2626">●</span> senior signal <span style="color:#2563eb">●</span> confirmed 20+ <span style="color:#0d9488">●</span> likely 20+';return d};lg.addTo(map);
+map.on('click',e=>{const p=e.containerPoint;let best=null,bd=100;for(const [x,y,i] of layer.px||[]){const d=(x-p.x)**2+(y-p.y)**2;if(d<bd){bd=d;best=i}}if(best!=null)card_(best)});
+const LBL={tenure_years_est:'Years since last deed',deed_date_est:'Last deed date (est.)',living_sqft:'Living sq ft',lot_acres:'Lot acres',full_baths:'Full baths',walk_proxy_0_100:'Walkability (0–100)',metro_north_dist_mi:'Metro-North distance (mi)',solar_terrain_index:'Sunlight index (100=flat open)',est_price_low:'Est. price low',est_price_mid:'Est. price mid',est_price_high:'Est. price high',est_price_per_sqft:'Est. $/sq ft'};
+function card_(i){const a=g('address',i)+', '+g('city_town',i)+' NY';const ll=g('lat',i)+','+g('lon',i);
+ let h=`<button class=sec style="float:right" onclick="card.style.display='none'">✕</button><iframe loading="lazy" style="width:100%;height:170px;border:0;border-radius:8px;margin:6px 0;background:#ddd" src="https://www.google.com/maps?layer=c&cbll=${g('sv_lat',i)??g('lat',i)},${g('sv_lon',i)??g('lon',i)}&cbp=11,${g('sv_heading',i)??0},0,0,0&output=svembed"></iframe><h2>${g('address',i)}</h2><div>${g('city_town',i)} · ${fmt$(g('est_price_low',i))} – ${fmt$(g('est_price_high',i))}</div>
+ <p><a target=_blank href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}">Google Maps</a> · <a target=_blank href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll}">Street View</a></p><table>`;
+ const derived={_tenure:'Tenure status',_senior:'Senior signal',_own:'Owner situation',_walk:'Walkability',_flood:'Flood risk',_slope:'Slope',_sun:'Sunlight',_mnwalk:'Walk to Metro-North (min est.)'};
+ for(const [k,l] of Object.entries(derived)){const v=val(k,i);h+=`<tr><td>${l}</td><td>${Array.isArray(v)?v.join(', '):v??'–'}</td></tr>`}
+ for(const k of Object.keys(D.c)){if(k[0]==='_')continue;let v=g(k,i);if(v==null)continue;if(/price|market_value/.test(k))v=fmt$(v);if(typeof v==='boolean')v=v?'Yes':'No';if(/_rating$/.test(k))v=RL[v]||v;h+=`<tr><td>${LBL[k]||k.replace(/_/g,' ')}</td><td>${v}</td></tr>`}
+ card.innerHTML=h+'</table>';card.style.display='block'}
+// buttons
+reset.onclick=()=>{S=defaults();build();apply()};
+abt.onclick=()=>{readme.textContent=README;about.style.display='block'};
+ftoggle.onclick=()=>fdiv.classList.toggle('open');
+exp.onclick=()=>{const ks=Object.keys(D.c).filter(k=>k[0]!=='_');const ds=['_tenure','_senior','_walk','_flood','_slope','_sun'];const q=v=>v==null?'':/[",\n]/.test(v=String(v))?'"'+v.replace(/"/g,'""')+'"':v;
+ const lines=[ks.concat(ds).join(',')];for(const i of idx)lines.push(ks.map(k=>q(g(k,i))).concat(ds.map(k=>q(val(k,i)))).join(','));
+ const b=new Blob([lines.join('\n')],{type:'text/csv'});const l=document.createElement('a');l.href=URL.createObjectURL(b);l.download='westchester_filtered.csv';l.click()};
+build();apply();loading.remove();window.__ready=true;
+})().catch(e=>{document.getElementById('loading').textContent='Error: '+e+' (needs a modern browser with DecompressionStream)'});
+</script></body></html>

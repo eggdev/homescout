@@ -1,0 +1,8 @@
+# Core install: database loader, exports, and the single-file app build.
+# County enrichment (raster, OSM, geopandas) is optional; see pyproject.toml [enrich].
+pandas>=2.2
+numpy>=1.26
+psycopg[binary]>=3.2
+pyarrow>=15
+requests>=2.31
+pytest>=8
