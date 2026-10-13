@@ -1,0 +1,20 @@
+# Local PostGIS for HomeScout. Does not load data; run migrations and the CSV loader after it is healthy.
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: homescout
+      POSTGRES_PASSWORD: homescout
+      POSTGRES_DB: homescout
+    ports:
+      - "5432:5432"
+    volumes:
+      - homescout-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homescout -d homescout"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  homescout-pg:
