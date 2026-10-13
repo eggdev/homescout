@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+dist/
+*.egg-info/
+
+# Raw pulls and derived intermediates. The app dataset under data/app/ is committed.
+data/raw/
+data/enrich/
+data/out/
+data/overlays/
+
+# Bulky public-source files wherever a script is run from.
+*.osm.pbf
+*.tif
+*.tiff
+dem.tif
+
+# Local exports and spreadsheet dumps.
+*.xlsx
+westchester_homes.html
+westchester_homes_mobile.html

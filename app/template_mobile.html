@@ -1,0 +1,483 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#ffffff"><title>Westchester Homes – long-tenure finder</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+:root{--g:#0d7a5f;--g2:#e8f5f0;--red:#d93025;--blue:#2563eb;--ink:#1f2328;--mut:#6b7280;--line:#e6e8eb;--sh:0 4px 18px rgba(0,0,0,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;overflow:hidden;font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+#map{position:fixed;inset:0;z-index:0;background:#e5e7eb}
+/* top search + chips */
+#top{position:fixed;top:0;left:0;right:0;z-index:500;padding:calc(env(safe-area-inset-top) + 10px) 10px 6px;pointer-events:none}
+#top>*{pointer-events:auto}
+.search{display:flex;align-items:center;gap:8px;background:#fff;border-radius:24px;box-shadow:var(--sh);padding:4px 6px 4px 14px;position:relative}
+.search input{flex:1;border:0;outline:0;font:inherit;padding:8px 0;min-width:0;background:transparent}
+.ibtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center}.ibtn:active{background:#f1f3f4}
+#sugg{position:absolute;top:100%;left:0;right:0;margin-top:6px;background:#fff;border-radius:14px;box-shadow:var(--sh);overflow:hidden;display:none}
+#sugg div{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}#sugg div small{color:var(--mut);margin-left:6px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 4px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;background:#fff;border:1px solid var(--line);border-radius:18px;padding:7px 13px;font-size:13.5px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08);white-space:nowrap}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+/* right control stack */
+#ctl{position:fixed;right:10px;top:132px;z-index:500;display:flex;flex-direction:column;gap:8px}
+#ctl button{width:44px;height:44px;background:#fff;border-radius:12px;box-shadow:var(--sh);display:grid;place-items:center;font-size:11px}
+#ctl button.on{background:var(--ink);color:#fff}
+#legend{position:fixed;left:10px;top:132px;z-index:400;background:rgba(255,255,255,.95);border-radius:10px;padding:6px 9px;font-size:11.5px;box-shadow:0 1px 6px rgba(0,0,0,.15);line-height:1.6}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+/* sun bar */
+#sunbar{position:fixed;left:0;right:0;z-index:450;background:rgba(32,36,44,.92);color:#fff;padding:6px 12px 8px;display:none;font-size:12.5px}
+#sunbar .row{display:flex;align-items:center;gap:8px}#sunbar input[type=range]{flex:1;accent-color:#f59e0b}
+#dayband{height:6px;border-radius:3px;margin:4px 0 2px;background:#444}
+#sunbar input[type=date]{background:#374151;color:#fff;border:0;border-radius:6px;padding:3px 6px;font:inherit}
+.pill-o{background:#f59e0b;color:#111;border-radius:6px;padding:2px 7px;font-weight:700}
+/* sheet */
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:600;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;transition:height .25s ease;height:132px;touch-action:none}
+#sheet.drag{transition:none}
+#grab{padding:8px 16px 6px;cursor:grab;touch-action:none}#grab:before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:#cfd3d8;margin:0 auto 8px}
+#grab h2{margin:0;font-size:16px}#grab .sub{color:var(--mut);font-size:13px;display:flex;justify-content:space-between;align-items:center}
+#grab select{border:0;font:inherit;color:var(--g);font-weight:600;background:none}
+#list{overflow-y:auto;flex:1;padding:0 12px 20px;touch-action:pan-y;overscroll-behavior:contain}
+.card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;display:grid;grid-template-columns:1fr auto;gap:2px;cursor:pointer;background:#fff}
+.card:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.card .p{font-size:18px;font-weight:800}.card .m{font-size:13.5px}.card .a{color:var(--mut);font-size:13px}
+.card .acts{grid-row:1/3;grid-column:2;display:flex;gap:2px}
+.tags{grid-column:1/3;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.tag{font-size:11.5px;background:#f3f4f6;border-radius:6px;padding:3px 7px;font-weight:600}
+.tag.tr{background:#efe7fd;color:#6d28d9}.tag.s{background:#fde8e6;color:#a1271c}.tag.t{background:var(--g2);color:var(--g)}.tag.w{background:#e8effd;color:#1e4fc2}.tag.u{background:#fff4dc;color:#8a5a00}
+.heart{font-size:20px;width:36px;height:36px;border-radius:50%}.heart.on{color:var(--red)}
+/* overlays */
+.ov{position:fixed;inset:0;z-index:1000;background:#fff;display:none;flex-direction:column}
+.ov.open{display:flex}.ovh{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:17px}
+.ovb{flex:1;overflow-y:auto;padding:4px 16px 20px}
+.foot{display:flex;gap:10px;padding:10px 14px calc(env(safe-area-inset-bottom) + 10px);border-top:1px solid var(--line);background:#fff}
+.btn{border-radius:10px;padding:12px 16px;font-weight:700}.btn.p{background:var(--g);color:#fff;flex:1}.btn.s{border:1px solid #c9cdd2}
+.sec{border-bottom:1px solid var(--line);padding:14px 0}.sec h3{margin:0 0 10px;font-size:16px}
+.fl{margin:12px 0}.fl>label,.fl>.lab{font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
+.hint{color:var(--mut);font-size:12px;font-weight:400;margin:2px 0 6px;display:block}
+.seg{display:flex;border:1px solid #c9cdd2;border-radius:10px;overflow:hidden}.seg button{flex:1;padding:9px 0;border-right:1px solid #c9cdd2;font-size:14px}.seg button:last-child{border:0}
+.seg button.on{background:var(--ink);color:#fff}.seg button.mid{background:#e5e7eb}
+.opts{display:flex;flex-wrap:wrap;gap:7px}.opt{border:1px solid #c9cdd2;border-radius:18px;padding:6px 12px;font-size:13px}.opt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.fl>label.unk{justify-content:flex-start;font-weight:400}.unk{font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:6px;margin-top:6px}
+.dual{position:relative;height:30px}.dual input{position:absolute;left:0;right:0;width:100%;top:6px;pointer-events:none;-webkit-appearance:none;appearance:none;background:none;margin:0}
+.dual input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--g);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.dual input::-moz-range-thumb{pointer-events:auto;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--g)}
+.dual .track{position:absolute;top:17px;left:0;right:0;height:4px;background:#d9dde1;border-radius:2px}.dual .fill{position:absolute;top:17px;height:4px;background:var(--g);border-radius:2px}
+.hist{display:flex;align-items:flex-end;height:48px;gap:1px;margin-top:6px}.hist i{flex:1;background:#cfd8d4;border-radius:2px 2px 0 0}.hist i.in{background:var(--g)}
+.mm{display:flex;gap:8px;margin-top:4px}.mm input{flex:1;min-width:0;border:1px solid #c9cdd2;border-radius:8px;padding:8px;font:inherit}
+.toggle{display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:14px}
+.switch{width:44px;height:26px;border-radius:13px;background:#c9cdd2;position:relative}.switch:after{content:"";position:absolute;width:22px;height:22px;top:2px;left:2px;border-radius:50%;background:#fff;transition:.2s}
+.switch.on{background:var(--g)}.switch.on:after{left:20px}
+select.full{width:100%;padding:9px;border-radius:8px;border:1px solid #c9cdd2;font:inherit}
+/* layers */
+.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
+.lt{border:2px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center;font-size:12.5px;font-weight:600}.lt .ic{font-size:26px;display:block;margin-bottom:4px}.lt.on{border-color:var(--g);background:var(--g2)}
+#layers{inset:auto 0 0 0;max-height:70vh;border-radius:18px 18px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.2)}
+/* detail */
+#detail .tabs{position:sticky;top:0;background:#fff;display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 8px;z-index:2;scrollbar-width:none}
+#detail .tabs button{padding:12px 10px;font-weight:600;font-size:14px;white-space:nowrap;border-bottom:3px solid transparent;color:var(--mut)}#detail .tabs button.on{color:var(--ink);border-color:var(--ink)}
+.hero{padding:14px 16px 4px}.hero .p{font-size:24px;font-weight:800}.hero .a{color:var(--mut)}
+.abtn{display:flex;gap:8px;padding:8px 16px}.abtn a{flex:1;text-align:center;border:1px solid #c9cdd2;border-radius:10px;padding:10px;color:var(--ink);text-decoration:none;font-weight:600;font-size:13.5px}
+.dsec{padding:6px 16px 14px;border-bottom:8px solid #f3f4f6}.dsec h3{font-size:18px;margin:14px 0 8px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.kv div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:9px 0;font-size:13.5px}.kv div span:first-child{color:var(--mut)}
+.risk{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}.risk .ic{font-size:20px;width:26px;text-align:center}.risk .tx{flex:1}.risk b{display:block}.risk small{color:var(--mut)}.risk .car{color:var(--mut);transition:.2s}.risk.open .car{transform:rotate(90deg)}.risk .more{display:none;font-size:12.5px;color:#374151;margin-top:6px}.risk.open .more{display:block}
+.gauge{display:flex;gap:16px;align-items:center}
+.drawbar{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:700;background:#fff;border-radius:12px;box-shadow:var(--sh);padding:10px;display:none;gap:8px}
+#about pre{white-space:pre-wrap;font-size:12.5px}
+#loading{position:fixed;inset:0;z-index:5000;background:#fff;display:grid;place-items:center;font-weight:600}
+.pricepin{background:var(--g);color:#fff;font-weight:700;font-size:11.5px;border-radius:12px;padding:3px 7px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:translate(-50%,-50%);display:inline-block;border:1.5px solid #fff}
+.pricepin.s{background:var(--red)}.pricepin.y{background:var(--blue)}.pricepin.sel{background:#111;transform:translate(-50%,-50%) scale(1.15)}
+.leaflet-div-icon.pp{background:none;border:0}
+.toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:#111;color:#fff;padding:9px 14px;border-radius:10px;z-index:3000;display:none;font-size:13px}
+.svhero{position:relative;height:240px;background:#ddd center/cover no-repeat;overflow:hidden}.svhero iframe{position:absolute;inset:0;width:100%;height:100%;border:0;opacity:0;transition:opacity .4s}.svhero.ok iframe{opacity:1}
+.svhero .svbtn{position:absolute;right:10px;bottom:10px;z-index:2;background:rgba(17,17,17,.8);color:#fff;border-radius:8px;padding:7px 10px;font-size:12.5px;text-decoration:none;font-weight:600}
+.svhero .svmsg{position:absolute;left:10px;bottom:12px;z-index:2;background:rgba(255,255,255,.9);border-radius:6px;padding:4px 8px;font-size:12px}.svhero.ok .svmsg{display:none}
+.cimg{grid-column:1/3;width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:8px;background:#eee}
+html,body{overscroll-behavior:none}#map{touch-action:none}
+#preview{position:fixed;left:10px;right:10px;z-index:620;display:none;max-width:460px;margin:0 auto}#preview .card{margin:0;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.card.hl{border-color:#111;box-shadow:0 0 0 2px #111 inset}
+#list{overflow-y:hidden;touch-action:none}#sheet.full #list{overflow-y:auto;touch-action:pan-y}
+.maplibregl-ctrl-attrib{font-size:10px}
+/* desktop */
+@media (min-width:900px){#list{overflow-y:auto!important;touch-action:pan-y!important}#preview{left:440px;right:auto;width:400px;bottom:16px}
+ #sheet{top:0;bottom:0;left:0;right:auto;width:420px;height:auto!important;border-radius:0;box-shadow:2px 0 12px rgba(0,0,0,.12);padding-top:122px}
+ #grab:before{display:none}#map{left:420px}#top{left:0;width:420px;right:auto;background:#fff;box-shadow:0 1px 0 var(--line);z-index:650}
+ #ctl{top:12px}#legend{left:432px;top:12px}#sunbar{left:420px}
+ .ov{left:auto;width:520px;box-shadow:-4px 0 20px rgba(0,0,0,.2)}#layers{left:auto;right:64px;top:12px;bottom:auto;width:380px;border-radius:14px}
+ .toast{left:calc(420px + 50%)}
+}
+</style></head><body>
+<div id="loading">Loading homes…</div>
+<div id="map"></div>
+<div id="top">
+ <div class="search"><span>🔍</span><input id="q" placeholder="Town, school district or address" autocomplete="off" enterkeyhint="search"><button class="ibtn" id="qclear" title="Clear" style="display:none">✕</button><button class="ibtn" id="locate" title="Locate me">◎</button><div id="sugg"></div></div>
+ <div class="chips" id="chips">
+  <button class="chip" data-c="price">Price ▾</button><button class="chip" data-c="bb">Beds/Baths ▾</button><button class="chip" data-c="t20">Owned 20+ yrs</button>
+  <button class="chip" data-c="sen">Senior owner</button><button class="chip" data-c="trust">Trust / Estate</button><button class="chip" data-c="sch">Schools ▾</button><button class="chip" data-c="more">⚙ More filters</button>
+ </div>
+</div>
+<div id="legend"><span class="dot" style="background:#d93025"></span>Senior owner<br><span class="dot" style="background:#2563eb"></span>Owned 20+ (confirmed)<br><span class="dot" style="background:#0d7a5f"></span>Likely 20+<br><span class="dot" style="background:#7c3aed"></span>Trust / estate (purple ring)</div>
+<div id="ctl"><button id="bLayers" title="Map layers">◧<br>Layers</button><button id="bDraw" title="Draw area">✎<br>Draw</button><button id="bSun" title="Sun">☀<br>Sun</button><button id="bAbout" title="About">ⓘ<br>About</button></div>
+<div class="drawbar" id="drawbar"><span id="drawmsg">Tap the map to add points</span><button class="btn s" id="drawUndo">Undo</button><button class="btn p" id="drawDone">Done</button><button class="btn s" id="drawCancel">Cancel</button></div>
+<div id="sunbar"><div class="row"><span>☀</span><input type="date" id="sunDate"><span class="pill-o" id="sunTime">12:00</span><span id="sunInfo"></span><a id="shadeLink" target="_blank" style="color:#fbbf24">ShadeMap ↗</a><button id="sunClose">✕</button></div>
+ <div id="dayband"></div><input type="range" id="sunSlider" min="0" max="1439" step="5" style="width:100%"><div id="sunHome" style="font-size:12px;color:#d1d5db"></div></div>
+<div id="preview"></div><div id="sheet"><div id="grab"><h2 id="count">–</h2><div class="sub"><span id="medline"></span><select id="sort"><option value="est_price_mid:-1">Price: high→low</option><option value="est_price_mid:1">Price: low→high</option><option value="_famyrs:-1">Longest owned (family)</option><option value="living_sqft:-1">Largest</option><option value="walk_proxy_0_100:-1">Most walkable</option><option value="metro_north_dist_mi:1">Nearest Metro-North</option><option value="solar_terrain_index:-1">Sunniest</option><option value="fav:-1">Saved first</option></select></div></div><div id="list"></div></div>
+<div class="ov" id="filters"><div class="ovh"><button onclick="closeOv('filters')">✕</button><span>Filters</span><span style="width:24px"></span></div><div class="ovb" id="fbody"></div>
+ <div class="foot"><button class="btn s" id="fReset">Reset all</button><button class="btn p" id="fSee">See homes</button></div></div>
+<div class="ov" id="layers"><div class="ovh"><span>Map layers</span><button onclick="closeOv('layers')">✕</button></div><div class="lgrid" id="lgrid"></div><div class="hint" style="padding:0 14px 14px">Flood zones are FEMA's live map service (zoom in to see). Sunlight colors homes by terrain-only sun index.</div></div>
+<div class="ov" id="detail"></div>
+<div class="ov" id="about"><div class="ovh"><button onclick="closeOv('about')">✕</button><span>About & caveats</span><span></span></div><div class="ovb"><p><b>What this is:</b> single-family homes in Westchester whose owner has likely held them 20+ years, built from free public records (NYS assessment roll, county GIS, FEMA, USGS, OpenStreetMap, Census). Prices are estimates, not appraisals; "senior owner" is inferred only from public tax exemptions. Data as of Oct 2026.</p><pre id="readme"></pre></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const README=__README__;const B64="__DATA__";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200)}
+function closeOv(id){$('#'+id).classList.remove('open');if(id==='detail'){history.replaceState(null,'',location.pathname+location.search+'#'+encodeURIComponent(JSON.stringify(S)));selected=null;drawPins()}}
+let S,selected=null,idx=[],N,C,D;
+(async()=>{
+const bin=Uint8Array.from(atob(B64),c=>c.charCodeAt(0));
+D=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).json();N=D.n;C=D.c;
+init();
+})().catch(e=>{$('#loading').textContent='Could not load: '+e+'. Please use a current browser (Chrome, Safari 16.4+, Firefox 113+).'});
+function init(){
+const g=(c,i)=>{const o=C[c];if(!o)return null;const v=o.v[i];if(v==null)return null;return o.t==='s'?o.d[v]:o.t==='b'?!!v:v};window.g=g;
+const col=(name,fn)=>{const v=new Array(N);for(let i=0;i<N;i++)v[i]=fn(i);C[name]={t:'x',v}};
+const val=(c,i)=>C[c].t==='x'?C[c].v[i]:g(c,i);window.val=val;
+const walkLbl=w=>w==null?null:w<25?'Car-dependent':w<50?'Somewhat car-dependent':w<70?'Somewhat walkable':w<90?'Very walkable':"Walker's paradise";
+col('_walk',i=>walkLbl(g('walk_proxy_0_100',i)));
+col('_flood',i=>{const z=g('fema_flood_zone',i);return z==null?null:/^X shaded/.test(z)?'Moderate (500-yr)':/^X/.test(z)?'Minimal':'High (100-yr)'});
+col('_slope',i=>{const s=g('slope_deg',i);return s==null?null:s<2?'Flat':s<8?'Gentle':s<15?'Moderate':'Steep'});
+col('_sun',i=>{const s=g('solar_terrain_index',i);return s==null?null:s<95?'Shaded':s<=102?'Average':'Sunny'});
+col('_tenure',i=>({yes:'Confirmed',likely:'Likely',unknown:'Unknown',no:'Under 20 yrs'})[g('tenure_20plus',i)]||null);
+col('_famyrs',i=>{const f=g('family_tenure_combined_yrs',i);if(f!=null)return f;const t=g('tenure_20plus',i),b=g('blank_deed_means_before_year',i);return t==='likely'&&b?2026-b:null});
+col('_trust',i=>/trust|estate/i.test(g('owner_type',i)||'')?1:0);
+col('_mnwalk',i=>{const d=g('metro_north_dist_mi',i);return d==null?null:Math.round(d*20)});
+col('_key',i=>g('SWIS',i)+'|'+g('PRINT_KEY',i));
+const tileURL=(la,lo,z)=>{const n=2**z,x=Math.floor((lo+180)/360*n),r=la*Math.PI/180,y=Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n);return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`};
+const svCam=i=>{const la=g('sv_lat',i),lo=g('sv_lon',i),h=g('sv_heading',i),d=g('road_dist_m',i);return (la!=null&&d!=null&&d<120)?{la,lo,h}:{la:g('lat',i),lo:g('lon',i),h:null}};
+const svEmbed=i=>{const c=svCam(i);return `https://www.google.com/maps?layer=c&cbll=${c.la},${c.lo}&cbp=11,${c.h??0},0,0,0&output=svembed`};
+const svOpen=i=>{const c=svCam(i);return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.la},${c.lo}${c.h!=null?'&heading='+c.h:''}`};
+const fmtK=v=>v==null?'–':v>=1e6?(v/1e6).toFixed(v>=1e7?0:2).replace(/\.?0+$/,'')+'M':Math.round(v/1e3)+'K';
+const fmt$=v=>v==null?'–':'$'+Math.round(v).toLocaleString();
+const monthly=p=>{if(p==null)return null;const L=p*.8,r=.065/12,n=360;return L*r/(1-Math.pow(1+r,-n))+p*.022/12+150};
+const RISK=['Very Low','Relatively Low','Relatively Moderate','Relatively High','Very High'];
+const RL={'Very Low':'Very low','Relatively Low':'Low','Relatively Moderate':'Moderate','Relatively High':'High','Very High':'Very high','Insufficient Data':'No data','No Rating':'No rating','Not Applicable':'N/A'};
+let favs=new Set(JSON.parse(localStorage.getItem('wch_favs')||'[]'));const saveFavs=()=>localStorage.setItem('wch_favs',JSON.stringify([...favs]));
+// ---------- filter model ----------
+// range: {min,max,unk}; cat: {v:[...],unk}
+const HAZ=[['nri_overall_rating','Overall natural hazard','🌐'],['nri_inland_flood_rating','River / inland flooding','🌊'],['nri_coastal_flood_rating','Coastal flooding','🏖'],['nri_hurricane_rating','Hurricane','🌀'],['nri_winter_weather_rating','Winter weather','❄️'],['nri_ice_storm_rating','Ice storm','🧊'],['nri_strong_wind_rating','Strong wind','💨'],['nri_heat_wave_rating','Heat wave','🔥'],['nri_cold_wave_rating','Cold wave','🥶'],['nri_landslide_rating','Landslide','⛰'],['nri_tornado_rating','Tornado','🌪']];
+const TRUSTS=['Revocable/Living trust','Irrevocable trust','Other trust','Estate','Life estate'];
+const RANGES={price:'est_price_mid',est_price_per_sqft:1,_famyrs:1,living_sqft:1,lot_acres:1,year_built:1,_mnwalk:1,walk_proxy_0_100:1,elevation_ft:1,bedrooms:1,full_baths:1};
+const CATS=['_tenure','owner_type','city_town','school_district_tiger','_walk','_flood','_slope','_sun','aspect_dir',...HAZ.map(h=>h[0])];
+const defaults=()=>({low:false,senior:null,own:[],trust:null,poly:null,priceWhich:'est_price_mid'});
+S=defaults();
+try{const h=decodeURIComponent(location.hash.slice(1));if(h&&h[0]==='{')S=Object.assign(defaults(),JSON.parse(h))}catch(e){}
+function inPoly(lat,lon,P){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const [yi,xi]=P[i],[yj,xj]=P[j];if(((yi>lat)!=(yj>lat))&&(lon<(xj-xi)*(lat-yi)/(yj-yi)+xi))c=!c}return c}
+function pass(i,skip){
+ if(!S.low){const p=g('est_price_mid',i);if(p!=null&&p<150000)return false}
+ for(const k in RANGES){if(k===skip)continue;const st=S[k];if(!st)continue;const v=k==='price'?g(S.priceWhich||'est_price_mid',i):val(k,i);
+  if(v==null){if(st.unk===false)return false;continue}if(st.min!=null&&v<st.min)return false;if(st.max!=null&&v>st.max)return false}
+ for(const k of CATS){const st=S[k];if(!st)continue;const v=val(k,i);if(v==null){if(st.unk===false)return false;continue}if(st.v&&st.v.length&&!st.v.includes(String(v)))return false}
+ if(S.senior===true&&!g('senior_signal',i))return false;
+ if(S.own.length){const m={lives:g('owner_occupied_est',i),away:g('absentee_owner',i),trust:g('trust_or_estate_owner',i)};if(!S.own.some(o=>m[o]))return false}
+ if(S.poly&&!inPoly(g('lat',i),g('lon',i),S.poly))return false;
+ return true}
+window.countWith=()=>{let n=0;for(let i=0;i<N;i++)if(pass(i))n++;return n};
+// ---------- map ----------
+const FLOOD_URL='https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&layers=show:28&format=png32&transparent=true&f=image';
+const map=new maplibregl.Map({container:'map',center:[-73.77,41.08],zoom:10.3,maxZoom:19,minZoom:8,dragRotate:false,pitchWithRotate:false,touchPitch:false,attributionControl:{compact:true},
+ style:{version:8,glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  sources:{osm:{type:'raster',tiles:['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png','https://b.tile.openstreetmap.org/{z}/{x}/{y}.png','https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap'},
+   sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Esri World Imagery'},
+   hill:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:16,attribution:'Esri Hillshade'},
+   flood:{type:'raster',tiles:[FLOOD_URL],tileSize:256,minzoom:12,attribution:'FEMA NFHL'}},
+  layers:[{id:'osm',type:'raster',source:'osm'},{id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}},{id:'hill',type:'raster',source:'hill',paint:{'raster-opacity':.45},layout:{visibility:'none'}},
+   {id:'flood',type:'raster',source:'flood',paint:{'raster-opacity':.6},layout:{visibility:'none'}}]}});
+window.map=map;let mapReady=false;const lat_=i=>g('lat',i),lon_=i=>g('lon',i);
+const EMPTY={type:'FeatureCollection',features:[]};
+function homesGeo(){const f=new Array(idx.length);for(let j=0;j<idx.length;j++){const i=idx[j];
+ const sun=g('solar_terrain_index',i);f[j]={type:'Feature',id:i,geometry:{type:'Point',coordinates:[lon_(i),lat_(i)]},properties:{i,c:g('senior_signal',i)?2:g('tenure_20plus',i)==='yes'?1:0,s:g('senior_signal',i)?1:0,p:fmtK(g('est_price_mid',i)),t:val('_trust',i),u:sun==null?1:sun<95?0:sun>102?2:1}}}
+ return {type:'FeatureCollection',features:f}}
+function pillImage(col,tr){const pr=2,w=40*pr,h=24*pr,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.beginPath();x.roundRect(0,0,w,h,12*pr);x.fill();if(tr){x.fillStyle='#7c3aed';x.beginPath();x.roundRect(0,0,w,h,12*pr);x.fill()}x.fillStyle=col;x.beginPath();x.roundRect((tr?2.5:1.5)*pr,(tr?2.5:1.5)*pr,w-(tr?5:3)*pr,h-(tr?5:3)*pr,(tr?9.5:10.5)*pr);x.fill();
+ return {img:x.getImageData(0,0,w,h),opt:{stretchX:[[13*pr,27*pr]],stretchY:[[11*pr,13*pr]],content:[7*pr,3*pr,33*pr,21*pr],pixelRatio:pr}}}
+const iconExpr=()=>['concat',LAY.sunheat?['concat','u',['to-string',['get','u']]]:['concat','p',['to-string',['get','c']]],['case',['==',['get','t'],1],'t','']];
+const colorExpr=()=>LAY.sunheat?['match',['get','u'],0,'#4338ca',2,'#f59e0b','#a3a3a3']:['match',['get','c'],2,'#d93025',1,'#2563eb','#0d7a5f'];
+map.on('load',()=>{[['p0','#0d7a5f'],['p1','#2563eb'],['p2','#d93025'],['u0','#4338ca'],['u1','#8b8b8b'],['u2','#d97706']].forEach(([n,c])=>{for(const tr of [0,1]){const pi=pillImage(c,tr);map.addImage(n+(tr?'t':''),pi.img,pi.opt)}});
+ map.addSource('sd',{type:'geojson',data:D.x.sd});map.addLayer({id:'sd-line',type:'line',source:'sd',paint:{'line-color':'#7c3aed','line-width':2},layout:{visibility:'none'}});
+ map.addLayer({id:'sd-label',type:'symbol',source:'sd',layout:{visibility:'none','text-field':['get','NAME'],'text-font':['Open Sans Semibold'],'text-size':11},paint:{'text-color':'#5b21b6','text-halo-color':'#fff','text-halo-width':1.5}});
+ map.addSource('mn',{type:'geojson',data:{type:'FeatureCollection',features:D.x.mn.map(([n,la,lo])=>({type:'Feature',geometry:{type:'Point',coordinates:[lo,la]},properties:{n}}))}});
+ map.addLayer({id:'mn',type:'circle',source:'mn',layout:{visibility:'none'},paint:{'circle-radius':7,'circle-color':'#0039a6','circle-stroke-color':'#fff','circle-stroke-width':2}});
+ map.addLayer({id:'mn-label',type:'symbol',source:'mn',minzoom:11,layout:{visibility:'none','text-field':['concat','🚆 ',['get','n']],'text-font':['Open Sans Semibold'],'text-size':11,'text-offset':[0,1.3]},paint:{'text-color':'#0039a6','text-halo-color':'#fff','text-halo-width':1.5}});
+ map.addSource('poly',{type:'geojson',data:EMPTY});map.addLayer({id:'poly-fill',type:'fill',source:'poly',paint:{'fill-color':'#111','fill-opacity':.06}});map.addLayer({id:'poly-line',type:'line',source:'poly',paint:{'line-color':'#111','line-width':2,'line-dasharray':[2,1]}});
+ map.addSource('homes',{type:'geojson',data:EMPTY,cluster:true,clusterMaxZoom:12,clusterRadius:48,clusterProperties:{sen:['+',['get','s']]}});
+ map.addLayer({id:'clusters',type:'circle',source:'homes',filter:['has','point_count'],paint:{'circle-color':['interpolate',['linear'],['/',['get','sen'],['get','point_count']],0,'#0d7a5f',.25,'#b45309',.45,'#d93025'],'circle-opacity':.88,
+  'circle-radius':['interpolate',['linear'],['get','point_count'],2,10,100,17,1000,26],'circle-stroke-color':'#fff','circle-stroke-width':2}});
+ map.addLayer({id:'cluster-count',type:'symbol',source:'homes',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Semibold'],'text-size':12,'text-allow-overlap':true},paint:{'text-color':'#fff'}});
+ map.addLayer({id:'dots',type:'circle',source:'homes',filter:['!',['has','point_count']],maxzoom:15,paint:{'circle-color':colorExpr(),'circle-radius':['interpolate',['linear'],['zoom'],12,3.5,15,6],'circle-stroke-color':'#fff','circle-stroke-width':1}});
+ map.addLayer({id:'pills',type:'symbol',source:'homes',filter:['!',['has','point_count']],minzoom:15,layout:{'icon-image':iconExpr(),'icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-field':['get','p'],'text-font':['Open Sans Semibold'],'text-size':12,'icon-allow-overlap':false,'text-allow-overlap':false,'symbol-sort-key':['-',['get','c']]},
+  paint:{'text-color':'#fff'}});
+ map.addLayer({id:'trust-badge',type:'circle',source:'homes',maxzoom:15,filter:['all',['!',['has','point_count']],['==',['get','t'],1]],paint:{'circle-color':'#7c3aed','circle-stroke-color':'#fff','circle-stroke-width':1.5,'circle-radius':['interpolate',['linear'],['zoom'],12,2.5,15,3.5],'circle-translate':[3.5,-3.5]}});
+ map.addSource('sel',{type:'geojson',data:EMPTY});map.addLayer({id:'sel',type:'circle',source:'sel',paint:{'circle-radius':['interpolate',['linear'],['zoom'],10,9,16,16],'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#111','circle-stroke-width':3}});
+ map.addSource('sun',{type:'geojson',data:EMPTY});map.addLayer({id:'sun',type:'line',source:'sun',paint:{'line-color':'#f59e0b','line-width':4,'line-dasharray':[1,2]}});
+ map.addSource('me',{type:'geojson',data:EMPTY});map.addLayer({id:'me',type:'circle',source:'me',paint:{'circle-radius':8,'circle-color':'#1a73e8','circle-stroke-color':'#fff','circle-stroke-width':3}});
+ for(const l of ['clusters'])map.on('click',l,e=>{const f=e.features[0];map.getSource('homes').getClusterExpansionZoom(f.properties.cluster_id).then(z=>map.easeTo({center:f.geometry.coordinates,zoom:z+.3}))});
+ for(const l of ['dots','pills']){map.on('click',l,e=>{if(drawing)return;preview(e.features[0].properties.i)});map.on('mouseenter',l,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',l,()=>map.getCanvas().style.cursor='')}
+ map.on('mouseenter','clusters',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','clusters',()=>map.getCanvas().style.cursor='');
+ mapReady=true;applyLayers();showPoly();apply(true);finishInit()});
+let lastData=null;
+function pushHomes(){if(!mapReady)return;if(lastData!==idx){lastData=idx;map.getSource('homes').setData(homesGeo())}}
+function drawPins(){if(!mapReady)return;map.getSource('sel').setData(selected==null?EMPTY:{type:'Feature',geometry:{type:'Point',coordinates:[lon_(selected),lat_(selected)]}})}
+const LAY={sd:false,flood:false,mn:false,hill:false,sat:false,sunheat:false};Object.assign(LAY,S.layers||{});
+function applyLayers(){if(!mapReady)return;const v=b=>b?'visible':'none';
+ map.setLayoutProperty('sd-line','visibility',v(LAY.sd));map.setLayoutProperty('sd-label','visibility',v(LAY.sd));map.setLayoutProperty('mn','visibility',v(LAY.mn));map.setLayoutProperty('mn-label','visibility',v(LAY.mn));
+ map.setLayoutProperty('flood','visibility',v(LAY.flood));map.setLayoutProperty('hill','visibility',v(LAY.hill));map.setLayoutProperty('sat','visibility',v(LAY.sat));map.setLayoutProperty('osm','visibility',v(!LAY.sat));
+ map.setPaintProperty('dots','circle-color',colorExpr());map.setLayoutProperty('pills','icon-image',iconExpr());
+ $('#legend').innerHTML=LAY.sunheat?'<b>Sunlight (terrain)</b><br><span class="dot" style="background:#4338ca"></span>Shaded <span class="dot" style="background:#a3a3a3"></span>Avg <span class="dot" style="background:#f59e0b"></span>Sunny':'<span class="dot" style="background:#d93025"></span>Senior owner<br><span class="dot" style="background:#2563eb"></span>Owned 20+ (confirmed)<br><span class="dot" style="background:#0d7a5f"></span>Likely 20+<br><span class="dot" style="background:#7c3aed"></span>Trust / estate (purple ring)'}
+map.on('click',e=>{if(drawing){drawPts.push([e.lngLat.lat,e.lngLat.lng]);drawPreview();return}
+ const hits=map.queryRenderedFeatures(e.point,{layers:['dots','pills','clusters'].filter(l=>map.getLayer(l))});if(!hits.length)hidePreview()});
+// map-area list (debounced)
+let areaT=null;map.on('moveend',()=>{clearTimeout(areaT);areaT=setTimeout(()=>{if(mapReady)renderList()},200)});
+// preview card above sheet
+function preview(i){selected=i;drawPins();const p=$('#preview');p.innerHTML=cardHTML(i);p.style.display='block';positionPreview();
+ p.querySelector('.card').onclick=e=>{if(e.target.closest('[data-fav],[data-share]'))return;openDetail(i)};
+ p.querySelector('[data-fav]').onclick=e=>{e.stopPropagation();toggleFav(p.querySelector('[data-fav]').dataset.fav)};p.querySelector('[data-share]').onclick=e=>{e.stopPropagation();share(i)};
+ $$('#list .card.hl').forEach(c=>c.classList.remove('hl'));const c=$(`#list .card[data-i="${i}"]`);if(c)c.classList.add('hl');if($('#sunbar').style.display==='block')updSun()}
+function hidePreview(){$('#preview').style.display='none'}
+function positionPreview(){const p=$('#preview');if(innerWidth>=900){p.style.bottom='16px';return}p.style.bottom=(sheet.offsetHeight+8)+'px'}
+// ---------- apply / list ----------
+let sortK='est_price_mid',sortD=-1;if(S.sort){[sortK,sortD]=S.sort.split(':');sortD=+sortD}$('#sort').value=sortK+':'+sortD;
+let sorted=[],shown=0;
+function apply(){idx=[];for(let i=0;i<N;i++)if(pass(i))idx.push(i);pushHomes();
+ S.sort=sortK+':'+sortD;S.layers=LAY;if(!$('#detail').classList.contains('open'))history.replaceState(null,'','#'+encodeURIComponent(JSON.stringify(S)));
+ const pr=idx.map(i=>g('est_price_mid',i)).filter(x=>x!=null).sort((a,b)=>a-b);
+ S._total=idx.length;
+ $('#fSee').textContent='See '+idx.length.toLocaleString()+' homes';
+ renderList();chipState();drawPins();window.__applied=(window.__applied||0)+1}
+function renderList(){let inArea=idx;if(mapReady){const b=map.getBounds();const w=b.getWest(),e=b.getEast(),so=b.getSouth(),n=b.getNorth();inArea=idx.filter(i=>{const la=lat_(i),lo=lon_(i);return la>=so&&la<=n&&lo>=w&&lo<=e})}
+ const pr=inArea.map(i=>g('est_price_mid',i)).filter(x=>x!=null).sort((a,b)=>a-b);
+ $('#count').textContent=inArea.length.toLocaleString()+(inArea.length===idx.length?' homes':' homes in map area');$('#medline').textContent=(inArea.length!==idx.length?'of '+idx.length.toLocaleString()+' · ':'')+(pr.length?'Median '+fmtK(pr[pr.length>>1]):'');
+ const sk=sortK==='fav'?null:sortK;sorted=inArea.slice().sort((a,b)=>{if(!sk){return (favs.has(val('_key',b))-favs.has(val('_key',a)))}const x=val(sk,a),y=val(sk,b);if(x==null)return 1;if(y==null)return -1;return (x>y?1:x<y?-1:0)*sortD});
+ shown=0;$('#list').innerHTML='';$('#list').scrollTop=0;more();if(selected!=null){const c=document.querySelector(`#list .card[data-i="${selected}"]`);if(c)c.classList.add('hl')}window.__listed=(window.__listed||0)+1}
+window.apply=apply;
+function tagsFor(i){const t=[];const ot=g('owner_type',i);if(/trust/i.test(ot||''))t.push(['tr','Trust']);else if(ot==='Estate')t.push(['tr','Estate']);else if(ot==='Life estate')t.push(['tr','Life estate']);const y=g('tenure_years_est',i),fy=g('family_tenure_combined_yrs',i),fam=g('family_confidence',i)==='same surname';
+ if(fam&&fy!=null&&(y==null||fy>y+0.5))t.push(['t','Family owned '+Math.floor(fy)+(g('family_tenure_combined_is_min',i)?'+':'')+' yrs']);
+ else if(y!=null)t.push(['t','Owned '+Math.floor(y)+' yrs']);else if(g('tenure_20plus',i)==='likely')t.push(['t','Owned '+(val('_famyrs',i)?Math.floor(val('_famyrs',i))+'+':'20+')+' yrs']);
+ if(g('senior_signal',i))t.push(['s','Senior owner']);const w=val('_walk',i);if(w&&/walkable|paradise/i.test(w))t.push(['w',w]);
+ const s=val('_sun',i);if(s==='Sunny')t.push(['u','Sunny']);const f=val('_flood',i);if(f&&f!=='Minimal')t.push(['s','Flood: '+f]);
+ const mw=val('_mnwalk',i);if(mw!=null&&mw<=15&&t.length<3)t.push(['w',mw+' min to train']);if(t.length<3&&g('absentee_owner',i))t.push(['','Owner mails elsewhere']);return t.slice(0,3)}
+function cardHTML(i){const k=val('_key',i);const b=g('bedrooms',i),ba=g('full_baths',i),sq=g('living_sqft',i);
+ const meta=[b!=null?b+' beds':null,ba!=null?ba+' baths':null,sq!=null?sq.toLocaleString()+' sq ft':null].filter(Boolean).join(' · ')||(g('lot_acres',i)!=null?g('lot_acres',i)+' acre lot':'Size not on record');
+ return `<div class="card" data-i="${i}"><div><div class="p">${fmtK(g('est_price_low',i))} – ${fmtK(g('est_price_high',i))}</div><div class="m">${meta}</div><div class="a">${g('address',i)||''}, ${g('city_town',i)}</div></div>
+ <div class="acts"><button class="heart ${favs.has(k)?'on':''}" data-fav="${k}" aria-label="Save">${favs.has(k)?'♥':'♡'}</button><button class="heart" data-share="${i}" aria-label="Share">⤴</button></div>
+ <div class="tags">${tagsFor(i).map(([c,t])=>`<span class="tag ${c}">${t}</span>`).join('')}</div></div>`}
+function more(){const L_=$('#list');const n=Math.min(sorted.length,shown+40);L_.insertAdjacentHTML('beforeend',sorted.slice(shown,n).map(cardHTML).join(''));shown=n}
+$('#list').addEventListener('scroll',e=>{const l=e.target;if(l.scrollTop+l.clientHeight>l.scrollHeight-400&&shown<sorted.length)more()});
+$('#list').addEventListener('click',e=>{const f=e.target.closest('[data-fav]');if(f){e.stopPropagation();toggleFav(f.dataset.fav,f);return}
+ const s=e.target.closest('[data-share]');if(s){e.stopPropagation();share(+s.dataset.share);return}const c=e.target.closest('.card');if(c){const i=+c.dataset.i;if(selected===i&&c.classList.contains('hl')){openDetail(i);return}preview(i);if(innerWidth<900)setSheet('peek');map.easeTo({center:[lon_(i),lat_(i)],zoom:Math.max(map.getZoom(),15.5),duration:600})}});
+function toggleFav(k,el){favs.has(k)?favs.delete(k):favs.add(k);saveFavs();$$(`[data-fav="${CSS.escape(k)}"]`).forEach(b=>{b.classList.toggle('on',favs.has(k));b.textContent=favs.has(k)?'♥':'♡'});toast(favs.has(k)?'Saved on this device':'Removed')}
+function share(i){const url=location.href.split('#')[0]+'#home='+encodeURIComponent(val('_key',i));const t=g('address',i)+', '+g('city_town',i)+' NY';
+ if(navigator.share)navigator.share({title:t,url}).catch(()=>{});else navigator.clipboard?.writeText(t+' '+url).then(()=>toast('Link copied'),()=>toast(url))}
+$('#sort').onchange=e=>{[sortK,sortD]=e.target.value.split(':');sortD=+sortD;apply()};
+// ---------- bottom sheet ----------
+const sheet=$('#sheet');const H=()=>innerHeight;let state='peek';
+const heights={peek:()=>132,half:()=>Math.round(H()*.5),full:()=>H()-70};
+function setSheet(s){state=s;if(innerWidth>=900)return;sheet.style.height=heights[s]()+'px';$('#sunbar').style.bottom=(s==='peek'?132:heights[s]())+'px'}
+window.setSheet=setSheet;setSheet('peek');
+let G=null,justDragged=false;const list=$('#list');
+function setSheetCls(){sheet.classList.toggle('full',state==='full')}
+const oldSet=setSheet;setSheet=function(st){oldSet(st);setSheetCls();if($('#preview').style.display==='block')positionPreview()};window.setSheet=setSheet;setSheetCls();
+function gStart(y,target){if(innerWidth>=900||target.closest('select,button,input,a'))return;G={y0:y,h0:sheet.offsetHeight,mode:null,moved:0,t0:performance.now(),onGrab:!!target.closest('#grab')}}
+function gMove(y,ev){if(!G)return;const dy=y-G.y0;G.moved=Math.max(G.moved,Math.abs(dy));
+ if(!G.mode&&Math.abs(dy)>6){G.mode=(G.onGrab||state!=='full'||(list.scrollTop<=0&&dy>0))?'sheet':'scroll';if(G.mode==='sheet')sheet.classList.add('drag')}
+ if(G.mode==='sheet'){ev.cancelable&&ev.preventDefault();sheet.style.height=Math.max(100,Math.min(H()-60,G.h0-dy))+'px';if($('#preview').style.display==='block')positionPreview()}}
+function gEnd(y){if(!G)return;const g_=G;G=null;sheet.classList.remove('drag');
+ if(g_.mode!=='sheet'){if(g_.onGrab&&g_.moved<6)setSheet(state==='peek'?'half':state==='half'?'full':'peek');return}
+ justDragged=true;setTimeout(()=>justDragged=false,50);const v=(y-g_.y0)/(performance.now()-g_.t0);const h=sheet.offsetHeight;const order=['peek','half','full'];
+ if(Math.abs(v)>.5){const cur=Object.entries(heights).map(([k,f])=>[k,Math.abs(f()-g_.h0)]).sort((a,b)=>a[1]-b[1])[0][0];let k=order.indexOf(cur)+(v<0?1:-1);setSheet(order[Math.max(0,Math.min(2,k))]);return}
+ setSheet(Object.entries(heights).map(([k,f])=>[k,Math.abs(f()-h)]).sort((a,b)=>a[1]-b[1])[0][0])}
+sheet.addEventListener('touchstart',e=>gStart(e.touches[0].clientY,e.target),{passive:true});
+sheet.addEventListener('touchmove',e=>gMove(e.touches[0].clientY,e),{passive:false});
+sheet.addEventListener('touchend',e=>gEnd(e.changedTouches[0].clientY));sheet.addEventListener('touchcancel',e=>gEnd(e.changedTouches[0]?.clientY??0));
+sheet.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'){gStart(e.clientY,e.target);if(G)G.onGrab=true}});
+addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&G)gMove(e.clientY,e)});addEventListener('pointerup',e=>{if(e.pointerType==='mouse')gEnd(e.clientY)});
+sheet.addEventListener('click',e=>{if(justDragged){e.stopPropagation();e.preventDefault()}},true);
+addEventListener('resize',()=>{setSheet(state);map.resize()});
+// ---------- search ----------
+const towns=[...new Set(C.city_town.d)],sds=C.school_district_tiger.d;
+$('#q').addEventListener('input',e=>{const q=e.target.value.trim().toUpperCase();$('#qclear').style.display=q?'':'none';const box=$('#sugg');if(q.length<2){box.style.display='none';return}
+ const out=[];towns.filter(t=>t.toUpperCase().includes(q)).slice(0,3).forEach(t=>out.push(['town',t,'Town']));sds.filter(t=>t.toUpperCase().includes(q)).slice(0,3).forEach(t=>out.push(['sd',t,'School district']));
+ if(q.length>=3){const a=C.address;let n=0;for(let i=0;i<N&&n<6;i++){const s=g('address',i);if(s&&s.includes(q)){out.push(['home',i,g('city_town',i)]);n++}}}
+ box.innerHTML=out.map(([t,v,l],j)=>`<div data-j="${j}">${t==='home'?g('address',v):v}<small>${l}</small></div>`).join('')||'<div>No matches</div>';box.style.display='block';
+ box.onclick=ev=>{const d=ev.target.closest('[data-j]');if(!d)return;const [t,v]=out[+d.dataset.j];box.style.display='none';
+  if(t==='home'){$('#q').value=g('address',v);openDetail(v,true);return}$('#q').value=v;
+  if(t==='town'){S.city_town={v:[v]};}else{S.school_district_tiger={v:[v]}}apply();fitIdx()}});
+$('#qclear').onclick=()=>{$('#q').value='';$('#qclear').style.display='none';$('#sugg').style.display='none';delete S.city_town;delete S.school_district_tiger;apply()};
+function fitIdx(){if(!idx.length)return;let a=90,b=-180,c=-90,d=180;for(const i of idx){const la=g('lat',i),lo=g('lon',i);a=Math.min(a,la);c=Math.max(c,la);d=Math.min(d,lo);b=Math.max(b,lo)}map.fitBounds([[d,a],[b,c]],{padding:{top:140,bottom:innerWidth<900?150:30,left:30,right:30},duration:700})}
+$('#locate').onclick=()=>{if(!navigator.geolocation)return toast('Location not available');navigator.geolocation.getCurrentPosition(p=>{map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:15});map.getSource('me').setData({type:'Point',coordinates:[p.coords.longitude,p.coords.latitude]})},()=>toast('Location permission denied'))};
+// ---------- filters sheet ----------
+function counts(k){const m=new Map();for(let i=0;i<N;i++){const v=val(k,i);if(v!=null)m.set(String(v),(m.get(String(v))||0)+1)}return m}
+const catCounts={};CATS.forEach(k=>catCounts[k]=counts(k));
+function rangeStats(k){const a=[];for(let i=0;i<N;i++){const v=k==='price'?g(S.priceWhich,i):val(k,i);if(v!=null)a.push(v)}a.sort((x,y)=>x-y);return a}
+const RS={};
+function rangeCtl(k,label,hint,unit,step,opts={}){const a=RS[k]||(RS[k]=rangeStats(k));const lo=a[Math.floor(a.length*.005)],hi=a[Math.floor(a.length*.995)];const st=S[k]||{};
+ const id='r_'+k;let hist='';if(opts.hist){const B=40,bins=new Array(B).fill(0);for(const v of a){if(v<lo||v>hi)continue;bins[Math.min(B-1,Math.floor((v-lo)/(hi-lo)*B))]++}const mx=Math.max(...bins);hist=`<div class="hist" id="h_${k}">${bins.map(b=>`<i style="height:${Math.max(2,b/mx*100)}%"></i>`).join('')}</div>`}
+ return `<div class="fl" data-r="${k}" data-lo="${lo}" data-hi="${hi}" data-step="${step}"><div class="lab">${label}<span class="hint" id="${id}_v" style="margin:0"></span></div>${hint?`<span class="hint">${hint}</span>`:''}${hist}
+ <div class="dual"><div class="track"></div><div class="fill"></div><input type="range" min="${lo}" max="${hi}" step="${step}" value="${st.min??lo}"><input type="range" min="${lo}" max="${hi}" step="${step}" value="${st.max??hi}"></div>
+ <div class="mm"><input type="number" inputmode="decimal" placeholder="No min" value="${st.min??''}"><input type="number" inputmode="decimal" placeholder="No max" value="${st.max??''}"></div>
+ <label class="unk"><input type="checkbox" ${st.unk===false?'':'checked'}> Include homes with unknown ${unit||'value'}</label></div>`}
+function catCtl(k,label,hint,fmt,order){const m=catCounts[k];let keys=[...m.keys()];if(order)keys.sort((a,b)=>{const x=order.indexOf(a),y=order.indexOf(b);return (x<0?99:x)-(y<0?99:y)});else keys.sort();
+ const st=S[k]||{};const sel=new Set(st.v||[]);
+ return `<div class="fl" data-c="${k}"><div class="lab">${label}</div>${hint?`<span class="hint">${hint}</span>`:''}<div class="opts">${keys.map(x=>`<button class="opt ${sel.has(x)?'on':''}" data-v="${x.replace(/"/g,'&quot;')}">${fmt?fmt(x):x} <small style="opacity:.6">${m.get(x).toLocaleString()}</small></button>`).join('')}</div>
+ <label class="unk"><input type="checkbox" ${st.unk===false?'':'checked'}> Include unknown</label></div>`}
+function selCtl(k,label,hint){const m=catCounts[k];const keys=[...m.keys()].sort();const st=S[k]||{};const sel=new Set(st.v||[]);
+ return `<div class="fl" data-c="${k}" data-multi="1"><div class="lab">${label}</div>${hint?`<span class="hint">${hint}</span>`:''}<div class="opts" style="max-height:170px;overflow:auto">${keys.map(x=>`<button class="opt ${sel.has(x)?'on':''}" data-v="${x.replace(/"/g,'&quot;')}">${x}</button>`).join('')}</div><label class="unk"><input type="checkbox" ${st.unk===false?'':'checked'}> Include unknown</label></div>`}
+function bbCtl(k,label){const st=S[k]||{};const vals=[1,2,3,4,5,6];return `<div class="fl" data-bb="${k}"><div class="lab">${label}<span class="hint" style="margin:0">tap two to select range</span></div><div class="seg">${['Any',...vals.map(v=>v===6?'6+':v)].map((t,j)=>`<button data-n="${j===0?'':vals[j-1]}">${t}</button>`).join('')}</div><label class="unk"><input type="checkbox" ${st.unk===false?'':'checked'}> Include unknown</label></div>`}
+function buildFilters(){const b=$('#fbody');
+ b.innerHTML=`<div class="sec" id="sec-price"><h3>Price</h3><div class="toggle"><span>Show estimated monthly payment</span><span class="switch ${S.monthly?'on':''}" id="swM"></span></div><span class="hint">Monthly ≈ 20% down, 30-yr at 6.5%, + property tax ~2.2%/yr + $150 insurance. Illustration only.</span>
+  <div class="fl"><div class="seg" id="pw"><button data-w="est_price_low">Low est.</button><button data-w="est_price_mid">Mid est.</button><button data-w="est_price_high">High est.</button></div></div>
+  ${rangeCtl('price','Estimated price','Assessed value ÷ state assessment ratio, adjusted to 2026 by Zillow index. Not an appraisal.','price',5000,{hist:1})}
+  ${rangeCtl('est_price_per_sqft','Price per sq ft ($)','','sq ft',5)}
+  <div class="toggle"><span>Include homes estimated under $150k <span class="hint">~207 homes, usually partial assessments</span></span><span class="switch ${S.low?'on':''}" id="swLow"></span></div></div>
+ <div class="sec" id="sec-bb"><h3>Beds & baths</h3>${bbCtl('bedrooms','Bedrooms')}${bbCtl('full_baths','Full bathrooms')}</div>
+ <div class="sec" id="sec-owner"><h3>Owner</h3>${catCtl('_tenure','Owned 20+ years','Under 20 yrs appears only for trust/estate homes (a transfer into a trust resets the deed date). Confirmed = last deed dated 2006 or earlier. Likely = deed older than county digital records (~2003; 2010 Greenburgh, 2013 North Castle).',null,['Confirmed','Likely','Unknown','Under 20 yrs'])}
+  ${rangeCtl('_famyrs','Years owned by family','Combined: for trust/estate homes, includes the same-surname owner before the trust deed. For deeds older than county digital records this is a minimum (e.g. 23 = 23+).','years',1)}
+  <div class="fl"><div class="lab">Senior owner</div><span class="hint">Aged or Enhanced STAR exemption = an owner is 65+. "No" doesn't mean not senior.</span><div class="seg" id="sen"><button data-s="">Any</button><button data-s="1">Senior exemption only</button></div></div>
+  ${catCtl('owner_type','Owner type','From owner names on the tax roll. Trust = often estate planning by older owners. Estate = owner likely deceased; sale often within 1–2 years. Life estate = an (often elderly) person keeps the home for life, then it passes on.',null,['Revocable/Living trust','Irrevocable trust','Other trust','Estate','Life estate','LLC/corporation','Individual(s)'])}
+  <div class="fl"><div class="lab">Owner situation</div><span class="hint">Any of the selected.</span><div class="opts" id="own"><button class="opt" data-o="lives">Lives there</button><button class="opt" data-o="away">Mail goes elsewhere</button><button class="opt" data-o="trust">Trust or estate</button></div></div></div>
+ <div class="sec" id="sec-home"><h3>Home</h3>${rangeCtl('living_sqft','Living area (sq ft)','Missing for Greenburgh, Lewisboro, North Castle, North Salem, Ossining.','sq ft',50)}${rangeCtl('lot_acres','Lot size (acres)','','lot size',.05)}${rangeCtl('year_built','Year built','','year',1)}</div>
+ <div class="sec" id="sec-loc"><h3>Location</h3>${selCtl('city_town','Town / city')}${selCtl('school_district_tiger','School district','Census 2024 boundaries.')}
+  ${catCtl('_walk','Walkability','Our OpenStreetMap score (not Walk Score): shops, food, schools, parks, transit within ~1 mile.',null,['Car-dependent','Somewhat car-dependent','Somewhat walkable','Very walkable',"Walker's paradise"])}
+  ${rangeCtl('_mnwalk','Walk to Metro-North (minutes)','Straight-line × 20 min/mile; real routes are longer.','distance',1)}</div>
+ <div class="sec" id="sec-risk"><h3>Risk & environment</h3>${catCtl('_flood','FEMA flood zone','At the parcel point; not an official determination.',null,['Minimal','Moderate (500-yr)','High (100-yr)'])}
+  <div class="fl"><div class="lab">FEMA hazard risk</div><span class="hint">Census-tract rating relative to the US. Pick a hazard, then levels.</span><select class="full" id="hazSel">${HAZ.map(h=>`<option value="${h[0]}">${h[2]} ${h[1]}</option>`).join('')}</select></div><div id="hazBox"></div>
+  ${catCtl('_slope','Slope of land','Flat <2°, Gentle 2–8°, Moderate 8–15°, Steep 15°+.',null,['Flat','Gentle','Moderate','Steep'])}
+  ${catCtl('aspect_dir','Facing direction','Direction the ground slopes toward; south-facing gets more sun.',null,['S','SE','SW','E','W','NE','NW','N','flat'])}
+  ${catCtl('_sun','Sunlight (terrain only)','Clear-sky sun vs. a flat open site; ignores trees and buildings.',null,['Shaded','Average','Sunny'])}</div>`;
+ wireFilters()}
+function hazBox(k){$('#hazBox').innerHTML=catCtl(k,'',' ',x=>RL[x]||x,RISK);wireCat($('#hazBox .fl'))}
+function wireCat(el){const k=el.dataset.c;el.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{o.classList.toggle('on');upd()});el.querySelector('.unk input').onchange=upd;
+ function upd(){const v=[...el.querySelectorAll('.opt.on')].map(o=>o.dataset.v);const u=el.querySelector('.unk input').checked;S[k]=v.length||!u?{v,unk:u}:undefined;if(!S[k])delete S[k];apply()}}
+function wireFilters(){const b=$('#fbody');
+ b.querySelectorAll('[data-r]').forEach(el=>{const k=el.dataset.r,lo=+el.dataset.lo,hi=+el.dataset.hi;const [r1,r2]=el.querySelectorAll('input[type=range]');const [n1,n2]=el.querySelectorAll('input[type=number]');const u=el.querySelector('.unk input');const fill=el.querySelector('.fill');
+  const isP=k==='price';const show=v=>isP?(S.monthly?'$'+Math.round(monthly(v)).toLocaleString()+'/mo':'$'+fmtK(v)):(+v).toLocaleString();
+  const paint=()=>{const a=Math.min(+r1.value,+r2.value),c=Math.max(+r1.value,+r2.value);fill.style.left=(a-lo)/(hi-lo)*100+'%';fill.style.width=(c-a)/(hi-lo)*100+'%';
+   $('#r_'+k+'_v').textContent=(S[k]?.min!=null||S[k]?.max!=null)?show(S[k].min??lo)+' – '+show(S[k].max??hi)+(S[k].max==null?'+':''):'Any';
+   const h=$('#h_'+k);if(h){const bs=h.children;for(let j=0;j<bs.length;j++){const v=lo+(j+.5)*(hi-lo)/bs.length;bs[j].classList.toggle('in',v>=a&&v<=c)}}};
+  const commit=()=>{const o={};const a=Math.min(+r1.value,+r2.value),c=Math.max(+r1.value,+r2.value);if(a>lo)o.min=a;if(c<hi)o.max=c;if(n1.value!=='')o.min=+n1.value;if(n2.value!=='')o.max=+n2.value;if(!u.checked)o.unk=false;
+   if(Object.keys(o).length)S[k]=o;else delete S[k];paint();apply()};
+  r1.oninput=r2.oninput=()=>{n1.value=Math.min(+r1.value,+r2.value)>lo?Math.min(+r1.value,+r2.value):'';n2.value=Math.max(+r1.value,+r2.value)<hi?Math.max(+r1.value,+r2.value):'';commit()};
+  n1.onchange=n2.onchange=u.onchange=commit;paint()});
+ b.querySelectorAll('.fl[data-c]').forEach(wireCat);
+ b.querySelectorAll('[data-bb]').forEach(el=>{const k=el.dataset.bb;const bs=[...el.querySelectorAll('.seg button')];let pick=[];const u=el.querySelector('.unk input');
+  const paint=()=>{const st=S[k];bs.forEach(x=>{const n=x.dataset.n===''?null:+x.dataset.n;const lo=st?.min,hi=st?.max;x.classList.toggle('on',st?(n!=null&&(n===lo||n===hi||(hi==null&&n===6&&lo===6))):n==null);x.classList.toggle('mid',!!st&&n!=null&&lo!=null&&(hi==null?n>lo:(n>lo&&n<hi)))})};
+  bs.forEach(x=>x.onclick=()=>{if(x.dataset.n===''){pick=[];delete S[k];paint();apply();return}const n=+x.dataset.n;pick.push(n);if(pick.length>2)pick=[n];
+   const a=Math.min(...pick),c=Math.max(...pick);S[k]=pick.length===1?{min:n}:{min:a,max:c>=6?undefined:c};if(!u.checked)S[k].unk=false;paint();apply()});
+  u.onchange=()=>{S[k]=Object.assign(S[k]||{},{unk:u.checked?undefined:false});apply()};paint()});
+ const pw=$('#pw');pw.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.w===S.priceWhich);x.onclick=()=>{S.priceWhich=x.dataset.w;delete RS.price;buildFilters();apply()}});
+ $('#swM').onclick=()=>{S.monthly=!S.monthly;buildFilters()};$('#swLow').onclick=()=>{S.low=!S.low;$('#swLow').classList.toggle('on',S.low);apply()};
+ $$('#sen button').forEach(x=>{x.classList.toggle('on',(x.dataset.s==='1')===(S.senior===true));x.onclick=()=>{S.senior=x.dataset.s?true:null;$$('#sen button').forEach(y=>y.classList.toggle('on',y===x));apply()}});
+ $$('#own .opt').forEach(x=>{x.classList.toggle('on',S.own.includes(x.dataset.o));x.onclick=()=>{x.classList.toggle('on');S.own=$$('#own .opt.on').map(y=>y.dataset.o);apply()}});
+ const hs=$('#hazSel');const act=HAZ.find(h=>S[h[0]]);if(act)hs.value=act[0];hs.onchange=()=>hazBox(hs.value);hazBox(hs.value)}
+function openFilters(sec){buildFilters();$('#filters').classList.add('open');if(sec)setTimeout(()=>$('#'+sec)?.scrollIntoView(),30)}
+$('#fSee').onclick=()=>{closeOv('filters');setSheet('half')};
+$('#fReset').onclick=()=>{const keep={layers:LAY};S=Object.assign(defaults(),keep);$('#q').value='';showPoly();buildFilters();apply()};
+function chipState(){const on={price:!!S.price||!!S.est_price_per_sqft,bb:!!(S.bedrooms||S.full_baths),t20:!!(S._tenure&&S._tenure.v&&S._tenure.v.length===1&&S._tenure.v[0]==='Confirmed'),sen:S.senior===true,trust:!!S.owner_type,sch:!!S.school_district_tiger,
+ more:Object.keys(S).some(k=>(CATS.includes(k)||RANGES[k])&&S[k]&&!['price','bedrooms','full_baths','school_district_tiger','owner_type'].includes(k))||S.own.length>0||!!S.poly};
+ $$('.chip').forEach(c=>c.classList.toggle('on',!!on[c.dataset.c]))}
+$('#chips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;const k=c.dataset.c;
+ if(k==='t20'){if(S._tenure&&S._tenure.v&&S._tenure.v[0]==='Confirmed')delete S._tenure;else S._tenure={v:['Confirmed']};apply();toast(S._tenure?'Showing confirmed 20+ year owners':'Including likely 20+ year owners')}
+ else if(k==='sen'){S.senior=S.senior===true?null:true;apply()}
+ else if(k==='trust'){if(S.owner_type)delete S.owner_type;else S.owner_type={v:TRUSTS};apply();toast(S.owner_type?'Showing trust, estate & life-estate owners':'All owner types')}
+ else openFilters({price:'sec-price',bb:'sec-bb',sch:'sec-loc',more:null}[k])};
+// ---------- layers ----------
+const LT=[['sd','🏫','School districts'],['flood','🌊','Flood zones (FEMA)'],['mn','🚆','Metro-North'],['hill','⛰','Terrain'],['sat','🛰','Satellite'],['sunheat','☀','Sunlight heatmap']];
+function buildLayers(){$('#lgrid').innerHTML=LT.map(([k,ic,l])=>`<button class="lt ${LAY[k]?'on':''}" data-l="${k}"><span class="ic">${ic}</span>${l}</button>`).join('');
+ $$('#lgrid .lt').forEach(b=>b.onclick=()=>{LAY[b.dataset.l]=!LAY[b.dataset.l];b.classList.toggle('on');applyLayers();apply();if(b.dataset.l==='flood'&&LAY.flood&&map.getZoom()<12)toast('Zoom in to see flood zones')})}
+$('#bLayers').onclick=()=>{buildLayers();$('#layers').classList.add('open')};
+// ---------- draw ----------
+let drawing=false,drawPts=[];
+const polyGeo=P=>P&&P.length?{type:'Feature',geometry:{type:P.length>2?'Polygon':'LineString',coordinates:P.length>2?[[...P,P[0]].map(p=>[p[1],p[0]])]:P.map(p=>[p[1],p[0]])}}:EMPTY;
+function drawPreview(){map.getSource('poly').setData(polyGeo(drawPts));$('#drawmsg').textContent=drawPts.length+' points'}
+$('#bDraw').onclick=()=>{if(S.poly){S.poly=null;showPoly();$('#bDraw').classList.remove('on');apply();toast('Area cleared');return}drawing=true;drawPts=[];$('#drawbar').style.display='flex';$('#drawmsg').textContent='Tap the map to add points';setSheet('peek')};
+$('#drawUndo').onclick=()=>{drawPts.pop();drawPreview()};
+$('#drawCancel').onclick=()=>{drawing=false;showPoly();$('#drawbar').style.display='none'};
+$('#drawDone').onclick=()=>{drawing=false;$('#drawbar').style.display='none';if(drawPts.length<3){showPoly();return toast('Need at least 3 points')}S.poly=drawPts.map(p=>[+p[0].toFixed(5),+p[1].toFixed(5)]);showPoly();apply()};
+function showPoly(){if(!mapReady)return;map.getSource('poly').setData(polyGeo(S.poly));$('#bDraw').classList.toggle('on',!!S.poly)}
+// ---------- sun ----------
+function sunPos(date,lat,lon){const rad=Math.PI/180,d=date/864e5-10957.5,g_=(357.529+.98560028*d)*rad,q=280.459+.98564736*d,L_=(q+1.915*Math.sin(g_)+.02*Math.sin(2*g_))*rad,e=(23.439-3.6e-7*d)*rad;
+ const ra=Math.atan2(Math.cos(e)*Math.sin(L_),Math.cos(L_)),dec=Math.asin(Math.sin(e)*Math.sin(L_));const gmst=(18.697374558+24.06570982441908*d)%24;const H=((gmst*15+lon)*rad-ra);
+ const alt=Math.asin(Math.sin(lat*rad)*Math.sin(dec)+Math.cos(lat*rad)*Math.cos(dec)*Math.cos(H));const az=Math.atan2(-Math.sin(H),Math.tan(dec)*Math.cos(lat*rad)-Math.sin(lat*rad)*Math.cos(H));return {alt:alt/rad,az:(az/rad+360)%360}}
+window.sunPos=sunPos;
+const dirName=a=>['N','NE','E','SE','S','SW','W','NW'][Math.round(a/45)%8];
+const today=new Date();$('#sunDate').value=today.toISOString().slice(0,10);$('#sunSlider').value=today.getHours()*60+today.getMinutes();
+function sunDateObj(){const [y,m,d]=$('#sunDate').value.split('-').map(Number);const mins=+$('#sunSlider').value;return new Date(y,m-1,d,Math.floor(mins/60),mins%60)}
+function updSun(){const c=selected!=null?[g('lat',selected),g('lon',selected)]:[map.getCenter().lat,map.getCenter().lng];const dt=sunDateObj();const p=sunPos(dt,c[0],c[1]);
+ $('#sunTime').textContent=dt.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ $('#sunInfo').textContent=p.alt>0?`${p.alt.toFixed(1)}° ∠ ${p.az.toFixed(0)}° ${dirName(p.az)}`:'Sun below horizon';
+ // daylight band
+ const base_=new Date(dt);base_.setHours(0,0,0,0);let stops=[];for(let m=0;m<1440;m+=10){const a=sunPos(new Date(+base_+m*6e4),c[0],c[1]).alt;stops.push(`${a>6?'#eab308':a>0?'#f97316':'#334155'} ${m/14.4}%`)}$('#dayband').style.background=`linear-gradient(90deg,${stops.join(',')})`;
+ $('#shadeLink').href=`https://shademap.app/@${c[0].toFixed(5)},${c[1].toFixed(5)},17z,${+dt}t,0b,0p,0m`;
+ if(mapReady)map.getSource('sun').setData(EMPTY);
+ if(selected!=null){const asp=g('aspect_deg',selected),sl=g('slope_deg',selected)||0;let txt=`Selected home faces ${val('_slope',selected)==='Flat'?'— (flat ground)':dirName(asp)+' ('+sl+'° slope)'}. `;
+  if(p.alt>0){const inc=Math.sin(p.alt*Math.PI/180)*Math.cos(sl*Math.PI/180)+Math.cos(p.alt*Math.PI/180)*Math.sin(sl*Math.PI/180)*Math.cos((p.az-(asp||0))*Math.PI/180);
+   const hz=g('horizon_max_deg',selected)||0;txt+=p.alt<hz?'Sun may be behind nearby hills now. ':inc>Math.sin(p.alt*Math.PI/180)?'Its slope faces toward the sun now (extra light). ':'Its slope faces away from the sun now. ';
+   const la=c[0],lo=c[1],len=.004;map.getSource('sun').setData({type:'LineString',coordinates:[[lo,la],[lo+len*Math.sin(p.az*Math.PI/180)/Math.cos(la*Math.PI/180),la+len*Math.cos(p.az*Math.PI/180)]]})}
+  $('#sunHome').textContent=txt+'Terrain only — trees/buildings not modeled.'}else $('#sunHome').textContent='Select a home to see its sun angle and facing.'}
+$('#sunSlider').oninput=updSun;$('#sunDate').onchange=updSun;map.on('moveend',()=>{if($('#sunbar').style.display==='block')updSun()});
+$('#bSun').onclick=()=>{const on=$('#sunbar').style.display!=='block';$('#sunbar').style.display=on?'block':'none';$('#bSun').classList.toggle('on',on);setSheet(state);updSun()};
+$('#sunClose').onclick=()=>$('#bSun').click();
+// ---------- detail ----------
+const riskText={'Very Low':'Much lower than most US areas','Relatively Low':'Lower than most US areas','Relatively Moderate':'About average for the US','Relatively High':'Higher than most US areas','Very High':'Among the highest in the US'};
+const scoreOf=r=>({'Very Low':1,'Relatively Low':3,'Relatively Moderate':5,'Relatively High':7,'Very High':9})[r];
+function ring(v){const r=34,c=2*Math.PI*r,p=Math.max(0,Math.min(1,(v-60)/50));const col=v<95?'#4338ca':v>102?'#f59e0b':'#9ca3af';
+ return `<svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="${r}" fill="none" stroke="#eee" stroke-width="9"/><circle cx="45" cy="45" r="${r}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c*p} ${c}" transform="rotate(-90 45 45)"/><text x="45" y="50" text-anchor="middle" font-size="18" font-weight="800">${v??'–'}</text></svg>`}
+function compass(asp,flat){return `<svg width="70" height="70" viewBox="-35 -35 70 70"><circle r="30" fill="#f8fafc" stroke="#d1d5db"/><text y="-20" text-anchor="middle" font-size="9">N</text><text y="27" text-anchor="middle" font-size="9">S</text><text x="-25" y="3" font-size="9">W</text><text x="20" y="3" font-size="9">E</text>${flat?'<circle r="4" fill="#9ca3af"/>':`<path d="M0,0 L0,-24" stroke="#f59e0b" stroke-width="4" transform="rotate(${asp})" stroke-linecap="round"/><circle r="3" fill="#111"/>`}</svg>`}
+function ownerExplain(i){const ot=g('owner_type',i)||'';let t='';
+ if(/trust/i.test(ot))t='<b>Held in a trust.</b> Usually estate planning, often by older owners. Moving a home into a trust records a new deed, so the "years owned" can look short even when the family has owned it for decades.';
+ else if(ot==='Estate')t='<b>Owned by an estate.</b> The owner has likely died; estate homes are often sold within 1–2 years.';
+ else if(ot==='Life estate')t='<b>Life estate.</b> A person (often elderly) keeps the right to live there for life; the home then passes to named heirs.';
+ else return '';const conf=g('family_confidence',i),fy=g('family_tenure_combined_yrs',i);
+ if(conf==='same surname')t+=`<br><b style="display:block;margin-top:6px">Family has owned it ${Math.floor(fy)}${g('family_tenure_combined_is_min',i)?'+':''} yrs</b><span class="hint">Before the trust/estate deed it was held by ${g('pre_trust_owner',i)} (deed ${g('pre_trust_deed_year',i)}); same surname, so likely the same family.</span>`;
+ else if(conf==='different')t+=`<span class="hint" style="margin-top:6px">Previous owner (${g('pre_trust_owner',i)}) has a different surname — likely a purchase, not a family transfer.</span>`;
+ else t+=`<span class="hint" style="margin-top:6px">The trust deed predates the 2021 rolls, so the pre-trust owner isn't visible in free data.</span>`;
+ return `<div style="background:#f5f0ff;border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:8px">${t}</div>`}
+function openDetail(i,fly){selected=i;const lat=g('lat',i),lon=g('lon',i);if(fly)map.jumpTo({center:[lon,lat],zoom:Math.max(map.getZoom(),16)});hidePreview();drawPins();if($('#sunbar').style.display==='block')updSun();
+ const k=val('_key',i),addr=g('address',i)+', '+g('city_town',i)+', NY '+(g('zip',i)||'');
+ const kv=rows=>`<div class="kv">${rows.filter(r=>r[1]!=null&&r[1]!=='').map(([a,b])=>`<div><span>${a}</span><span>${b}</span></div>`).join('')}</div>`;
+ const yn=v=>v==null?null:v?'Yes':'No';const sun=g('solar_terrain_index',i);
+ const flood=val('_flood',i);
+ const climate=[['🌊','Flood zone: '+(flood||'unknown'),'FEMA flood zone',flood==='High (100-yr)'?'In the 100-year floodplain (1% yearly chance). Flood insurance typically required with a mortgage.':flood==='Moderate (500-yr)'?'0.2% yearly chance (500-year zone).':'Outside FEMA mapped flood hazard at the parcel point.',`Zone ${g('fema_flood_zone',i)}${g('fema_bfe_ft',i)?'; base flood elevation '+g('fema_bfe_ft',i)+' ft':''}. Parcel elevation ${g('elevation_ft',i)} ft. Point-based check; part of the lot may differ.`],
+  ...HAZ.map(([c,l,ic])=>{const r=g(c,i);const sc=g(c.replace('_rating','_score'),i);return [ic,r?(scoreOf(r)?scoreOf(r)+'/10 ':'')+l:l+': no data',RL[r]||'',r?riskText[r]||(RL[r]||r):'Not rated for this tract',`FEMA National Risk Index ${sc!=null?'score '+(+sc).toFixed(1)+' (national percentile-style, 0–100)':''} for census tract ${g('tract_geoid',i)||''}. Same value for all homes in the tract.`]})];
+ const tabs=[['ov','Overview'],['ow','Owner'],['nb','Neighborhood'],['cl','Climate & sun'],['pr','Property']];
+ $('#detail').innerHTML=`<div class="ovh"><button onclick="closeOv('detail')">← Back</button><span style="font-size:15px">${g('city_town',i)}</span><span><button class="heart ${favs.has(k)?'on':''}" data-fav="${k}">${favs.has(k)?'♥':'♡'}</button><button class="heart" id="dShare">⤴</button></span></div>
+ <div class="ovb" id="dbody" style="padding:0"><div class="svhero" id="svh" style="background-image:url('${tileURL(lat,lon,18)}')"><span class="svmsg">Loading Street View…</span><a class="svbtn" target="_blank" href="${svOpen(i)}">Open in Street View ↗</a></div><div class="tabs">${tabs.map(([id,l],j)=>`<button data-t="${id}" class="${j?'':'on'}">${l}</button>`).join('')}</div>
+ <div class="hero" id="t-ov"><div class="p">${fmt$(g('est_price_low',i))} – ${fmt$(g('est_price_high',i))}</div><div>Mid estimate <b>${fmt$(g('est_price_mid',i))}</b> · ≈ ${fmt$(monthly(g('est_price_mid',i)))}/mo</div>
+  <div style="margin-top:4px;font-size:15px">${[g('bedrooms',i)!=null?'<b>'+g('bedrooms',i)+'</b> beds':null,g('full_baths',i)!=null?'<b>'+g('full_baths',i)+'</b> baths':null,g('living_sqft',i)!=null?'<b>'+g('living_sqft',i).toLocaleString()+'</b> sq ft':null,g('lot_acres',i)!=null?'<b>'+g('lot_acres',i)+'</b> acres':null].filter(Boolean).join(' · ')}</div>
+  <div class="a">${addr}</div><div class="tags" style="display:flex">${tagsFor(i).map(([c,t])=>`<span class="tag ${c}">${t}</span>`).join('')}</div></div>
+ <div class="abtn"><a target="_blank" href="${svOpen(i)}">👁 Street View</a><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">🗺 Google Maps</a></div>
+ <div class="dsec"><span class="hint">Price is an estimate from public assessment data (not an appraisal or listing). This home is not necessarily for sale or rent.</span></div>
+ <div class="dsec" id="t-ow"><h3>Owner</h3>${ownerExplain(i)}${kv([['Owner type',g('owner_type',i)],['Deed recorded',g('deed_recorded_year',i)?String(g('deed_recorded_year',i)):(g('deed_basis',i)?'before county digital records':null)],['Why in this list',g('why_included',i)],['Pre-trust owner',g('pre_trust_owner',i)],['Pre-trust deed year',g('pre_trust_deed_year',i)],['Family tenure (combined)',g('family_tenure_combined_yrs',i)!=null?Math.floor(g('family_tenure_combined_yrs',i))+(g('family_tenure_combined_is_min',i)?'+':'')+' yrs':null],['Family match confidence',g('family_confidence',i)],['Owner',g('owner',i)],['Additional owner',g('additional_owner',i)],['Owned 20+ yrs',val('_tenure',i)],['Last deed (est.)',g('deed_date_est',i)],['Years since deed',g('tenure_years_est',i)],['Deed basis',g('deed_basis',i)],['Senior signal',yn(g('senior_signal',i))],['Aged exemption',yn(g('senior_aged_exemption_4180x',i))],['Enhanced STAR',yn(g('enhanced_star_4183x',i))],['Lives there (est.)',yn(g('owner_occupied_est',i))],['Trust / estate',yn(g('trust_or_estate_owner',i))],['Veteran exemption',yn(g('veteran_exemption',i))],['Mailing address',[g('mail_addr',i),g('mail_city',i),g('mail_state',i),g('mail_zip',i)].filter(Boolean).join(', ')],['Exemption codes',g('exemption_codes_4digit',i)]])}</div>
+ <div class="dsec" id="t-nb"><h3>Neighborhood</h3>${kv([['School district',g('school_district_tiger',i)],['District (tax roll)',g('school_district_roll',i)],['Walkability',(g('walk_proxy_0_100',i)??'–')+' · '+(val('_walk',i)||'')],['Nearest Metro-North',g('metro_north_station',i)],['Distance',g('metro_north_dist_mi',i)+' mi (~'+val('_mnwalk',i)+' min walk)'],['Groceries ≤½ mi',g('n_grocery_within_800m',i)],['Restaurants/cafés ≤½ mi',g('n_dining_within_800m',i)],['Shops/errands ≤½ mi',g('n_errands_within_800m',i)],['Schools ≤½ mi',g('n_school_within_800m',i)],['Parks ≤½ mi',g('n_park_within_800m',i)],['Transit stops ≤½ mi',g('n_transit_within_800m',i)],['FEMA social vulnerability',RL[g('nri_social_vuln_rating',i)]||g('nri_social_vuln_rating',i)],['Community resilience',RL[g('nri_community_resilience_rating',i)]||g('nri_community_resilience_rating',i)]])}</div>
+ <div class="dsec" id="t-cl"><h3>Climate risks</h3>${climate.map(([ic,t,lv,s,m])=>`<div class="risk"><span class="ic">${ic}</span><div class="tx"><b>${t}</b><small>${s}</small><div class="more">${m}</div></div><span class="car">›</span></div>`).join('')}
+  <h3>Sun exposure</h3><div class="gauge">${ring(sun)}<div><b>${val('_sun',i)||'–'} (terrain)</b><br><small>${sun==null?'':sun<95?'Hills or a north-facing slope cut sunlight noticeably vs. open flat ground.':sun>102?'South-tilted ground gets more sun than flat open land.':'Close to flat, open ground for annual sunlight.'} Index 100 = flat, unobstructed site. Trees, buildings and roof shape not modeled.</small></div></div>
+  <div class="gauge" style="margin-top:10px">${compass(g('aspect_deg',i)||0,val('_slope',i)==='Flat')}<div><small>Ground faces <b>${val('_slope',i)==='Flat'?'— (flat)':g('aspect_dir',i)}</b> · slope ${g('slope_deg',i)}° (${val('_slope',i)})<br>Hills block up to ${g('horizon_max_deg',i)}° of sky (south: ${g('horizon_south_deg',i)}°) · sky view ${g('sky_view_factor',i)}</small><br>
+  <button class="btn s" style="margin-top:6px;padding:7px 10px" id="dSun">☀ Sun at this home</button> <a target="_blank" href="https://shademap.app/@${lat},${lon},17z" style="font-size:13px">ShadeMap ↗</a></div></div></div>
+ <div class="dsec" id="t-pr"><h3>Property</h3>${kv([['Year built',g('year_built',i)],['Style',g('style',i)],['Living sq ft',g('living_sqft',i)?.toLocaleString()],['Bedrooms',g('bedrooms',i)],['Full baths',g('full_baths',i)],['Kitchens',g('kitchens',i)],['Lot',g('lot_acres',i)!=null?g('lot_acres',i)+' acres':null],['Elevation',g('elevation_ft',i)+' ft'],['Roll full market value',fmt$(g('full_market_value',i))],['Market value 2024 (RAR)',fmt$(g('market_value_2024_from_rar',i))],['Est. $/sq ft',g('est_price_per_sqft',i)!=null?'$'+g('est_price_per_sqft',i):null],['Town ratio (RAR %)',g('rar_2025_pct',i)],['Assessment dispersion (COD %)',g('cod_pct',i)],['SWIS / print key',g('SWIS',i)+' / '+g('PRINT_KEY',i)],['Deed book/page',(g('deed_book',i)||'–')+' / '+(g('deed_page',i)||'–')],['Census tract',g('tract_geoid',i)]])}
+  <p class="hint">Permits: no free bulk permit data for Westchester; check the town building department.</p></div></div>`;
+ const det=$('#detail');det.classList.add('open');loadSV(i);const body=$('#dbody');
+ det.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{const t=$('#t-'+b.dataset.t);body.scrollTo({top:t.offsetTop-46,behavior:'smooth'})});
+ body.onscroll=()=>{let cur='ov';for(const [id] of tabs){const t=$('#t-'+id);if(t.offsetTop-60<=body.scrollTop)cur=id}det.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===cur))};
+ det.querySelectorAll('.risk').forEach(r=>r.onclick=()=>r.classList.toggle('open'));
+ det.querySelector('[data-fav]').onclick=e=>toggleFav(k,e.target);$('#dShare').onclick=()=>share(i);
+ $('#dSun').onclick=()=>{closeOv('detail');selected=i;drawPins();if($('#sunbar').style.display!=='block')$('#bSun').click();else updSun();map.easeTo({center:[lon,lat],zoom:17})};
+ history.replaceState(null,'','#home='+encodeURIComponent(k))}
+function loadSV(i){const h=$('#svh');if(!h)return;const f=document.createElement('iframe');f.loading='lazy';f.referrerPolicy='no-referrer-when-downgrade';f.allowFullscreen=true;f.title='Street View';
+ const to=setTimeout(()=>{if(!h.classList.contains('ok'))h.querySelector('.svmsg').textContent='Street View unavailable — satellite view shown'},9000);
+ f.onload=()=>{clearTimeout(to);h.classList.add('ok')};f.src=svEmbed(i);h.prepend(f)}
+window.openDetail=openDetail;window.drawPins=drawPins;
+$('#bAbout').onclick=()=>{$('#readme').textContent=README;$('#about').classList.add('open')};
+// ---------- start ----------
+function finishInit(){$('#loading').remove();
+const hm=location.hash.match(/^#home=(.+)/);if(hm){const k=decodeURIComponent(hm[1]);const i=C._key.v.indexOf(k);if(i>=0)openDetail(i,true)}
+window.__ready=true;}
+}
+</script></body></html>
